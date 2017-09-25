@@ -17,6 +17,8 @@
 
 namespace LazyJsonMapper;
 
+use LazyJsonMapper\Exceptions\BadPropertyDefinitionException;
+
 /**
  * Describes the behavior of a LazyJsonMapper property.
  *
@@ -75,7 +77,7 @@ class PropertyDefinition
      * @param string|null $definitionStr The string describing the property, or
      *                                   NULL to create a default "undefined" property
      *
-     * @throws \InvalidArgumentException If any parameter is invalid.
+     * @throws BadPropertyDefinitionException If the provided definition is invalid.
      */
     public function __construct(
         $definitionStr = null)
@@ -91,7 +93,7 @@ class PropertyDefinition
         }
 
         if (!is_string($definitionStr)) {
-            throw new \InvalidArgumentException('The property definition must be a string value.');
+            throw new BadPropertyDefinitionException('The property definition must be a string value.');
         }
 
         $this->isUndefined = false;
@@ -117,7 +119,7 @@ class PropertyDefinition
         if ($this->isObjectType) {
             // Ensure that the target class actually exists (via autoloader).
             if (!class_exists($this->propType)) {
-                throw new \InvalidArgumentException(sprintf('Class "%s" not found.', $this->propType));
+                throw new BadPropertyDefinitionException(sprintf('Class "%s" not found.', $this->propType));
             }
 
             // We'll use a reflector for analysis, but FIRST use it to clean up
@@ -136,13 +138,13 @@ class PropertyDefinition
             // would be very unreliable. But we'll allow it if they want to.
             if ($this->propType !== LazyJsonMapper::class
                 && !$reflector->isSubClassOf(LazyJsonMapper::class)) {
-                throw new \RuntimeException(sprintf('Class "%s" must inherit from LazyJsonMapper.', $this->propType));
+                throw new BadPropertyDefinitionException(sprintf('Class "%s" must inherit from LazyJsonMapper.', $this->propType));
             }
         } elseif ($this->propType !== '') {
             // Ensure that our basic non-empty type value is a real PHP type.
             // NOTE: This is intentionally cAsE-sensitive.
             if (!in_array($this->propType, self::$_basicTypes)) {
-                throw new \InvalidArgumentException(sprintf('Invalid property type "%s".', $this->propType));
+                throw new BadPropertyDefinitionException(sprintf('Invalid property type "%s".', $this->propType));
             }
         }
     }

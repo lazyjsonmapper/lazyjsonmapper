@@ -33,36 +33,54 @@ namespace LazyJsonMapper\Exceptions;
 class CircularPropertyMapException extends BadPropertyMapException
 {
     /** @var string|null */
-    private $_badClassName;
+    private $_badClassNameA;
+
+    /** @var string|null */
+    private $_badClassNameB;
 
     /**
      * Constructor.
      *
-     * @param string $badClassName The name of the class that's being referred
-     *                             to again while it's already being compiled.
+     * @param string $badClassNameA Name of the first class involved in the circular map.
+     * @param string $badClassNameB Name of the second class involved in the circular map.
      */
     public function __construct(
-        $badClassName)
+        $badClassNameA = null,
+        $badClassNameB = null)
     {
-        if (!is_string($badClassName)) {
-            $badClassName = null;
+        if (!is_string($badClassNameA)) {
+            $badClassNameA = null;
         }
-        $this->_badClassName = $badClassName;
+        $this->_badClassNameA = $badClassNameA;
+        if (!is_string($badClassNameB)) {
+            $badClassNameB = null;
+        }
+        $this->_badClassNameB = $badClassNameB;
 
-        if ($badClassName !== null) {
-            parent::__construct(sprintf('Circular reference to "%s" in JSON property map import instruction.', $badClassName));
+        if ($badClassNameA !== null && $badClassNameB !== null) {
+            parent::__construct(sprintf('Circular reference between classes "%s" and "%s" in JSON property map import instruction.', $badClassNameA, $badClassNameB));
         } else {
             parent::__construct('Circular reference in JSON property map import instruction.');
         }
     }
 
     /**
-     * Get the name of the class that couldn't be resolved due to circular map.
+     * Get the name of the first class involved in the circular map.
      *
      * @return string|null
      */
-    public function getBadClassName()
+    public function getBadClassNameA()
     {
-        return $this->_badClassName;
+        return $this->_badClassNameA;
+    }
+
+    /**
+     * Get the name of the second class involved in the circular map.
+     *
+     * @return string|null
+     */
+    public function getBadClassNameB()
+    {
+        return $this->_badClassNameB;
     }
 }

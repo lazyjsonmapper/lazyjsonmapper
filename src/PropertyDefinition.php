@@ -18,6 +18,7 @@
 namespace LazyJsonMapper;
 
 use LazyJsonMapper\Exceptions\BadPropertyDefinitionException;
+use ReflectionClass;
 
 /**
  * Describes the behavior of a LazyJsonMapper property.
@@ -126,7 +127,7 @@ class PropertyDefinition
             // the case-insensitive class name to become the EXACT name for the
             // class. So that we can trust "propType" in strict name comparisons.
             // Example: "\fOO\bAr" to "Foo\Bar" (note that the leading \ vanishes).
-            $reflector = new \ReflectionClass($this->propType);
+            $reflector = new ReflectionClass($this->propType);
             $this->propType = $reflector->getName();
 
             // The target class or its parents MUST inherit from LazyJsonMapper,

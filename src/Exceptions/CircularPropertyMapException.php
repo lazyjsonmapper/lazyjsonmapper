@@ -30,4 +30,37 @@ namespace LazyJsonMapper\Exceptions;
  */
 class CircularPropertyMapException extends \RuntimeException
 {
+    /** @var string|null */
+    private $_badClassName;
+
+    /**
+     * Constructor.
+     *
+     * @param string $badClassName The name of the class that's being referred
+     *                             to again while it's already being compiled.
+     */
+    public function __construct(
+        $badClassName)
+    {
+        if (!is_string($badClassName)) {
+            $badClassName = null;
+        }
+        $this->_badClassName = $badClassName;
+
+        if ($badClassName !== null) {
+            parent::__construct(sprintf('Circular reference to "%s" in JSON property map import instruction.', $badClassName));
+        } else {
+            parent::__construct('Circular reference in JSON property map import instruction.');
+        }
+    }
+
+    /**
+     * Get the name of the class that couldn't be resolved due to circular map.
+     *
+     * @return string|null
+     */
+    public function getBadClassName()
+    {
+        return $this->_badClassName;
+    }
 }

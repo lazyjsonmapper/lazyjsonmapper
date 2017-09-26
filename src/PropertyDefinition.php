@@ -19,6 +19,7 @@ namespace LazyJsonMapper;
 
 use LazyJsonMapper\Exceptions\BadPropertyDefinitionException;
 use ReflectionClass;
+use ReflectionException;
 
 /**
  * Describes the behavior of a LazyJsonMapper property.
@@ -123,23 +124,27 @@ class PropertyDefinition
                 throw new BadPropertyDefinitionException(sprintf('Class "%s" not found.', $this->propType));
             }
 
-            // We'll use a reflector for analysis, but FIRST use it to clean up
-            // the case-insensitive class name to become the EXACT name for the
-            // class. So that we can trust "propType" in strict name comparisons.
-            // Example: "\fOO\bAr" to "Foo\Bar" (note that the leading \ vanishes).
-            $reflector = new ReflectionClass($this->propType);
-            $this->propType = $reflector->getName();
+            // We'll use a reflector for analysis, to ensure the class is valid.
+            try {
+                // First clean up the case-insensitive class name to become the
+                // EXACT name for the class. So we can trust "propType" in ===.
+                // Example: "\fOO\bAr" to "Foo\Bar" (notice leading \ vanishes).
+                $reflector = new ReflectionClass($this->propType);
+                $this->propType = $reflector->getName();
 
-            // The target class or its parents MUST inherit from LazyJsonMapper,
-            // so that it implements the necessary behaviors and can be trusted
-            // to accept our standardized constructor parameters.
-            // NOTE: As you can see, we also allow users to map directly to a
-            // plain "LazyJsonMapper" object. It's a very bad idea, since they
-            // wouldn't get any property definitions, and therefore their object
-            // would be very unreliable. But we'll allow it if they want to.
-            if ($this->propType !== LazyJsonMapper::class
-                && !$reflector->isSubClassOf(LazyJsonMapper::class)) {
-                throw new BadPropertyDefinitionException(sprintf('Class "%s" must inherit from LazyJsonMapper.', $this->propType));
+                // The target class or its parents MUST inherit LazyJsonMapper,
+                // so it implements the necessary behaviors and can be trusted
+                // to accept our standardized constructor parameters.
+                // NOTE: As you can see, we also allow users to map directly to
+                // plain "LazyJsonMapper" objects. It's a very bad idea, since
+                // they don't get any property definitions, and therefore their
+                // object would be unreliable. But that's the user's choice.
+                if ($this->propType !== LazyJsonMapper::class
+                    && !$reflector->isSubClassOf(LazyJsonMapper::class)) {
+                    throw new BadPropertyDefinitionException(sprintf('Class "%s" must inherit from LazyJsonMapper.', $this->propType));
+                }
+            } catch (ReflectionException $e) {
+                throw new BadPropertyDefinitionException(sprintf('Reflection failed for class "%s". Reason: "%s".', $this->propType, $e->getMessage()));
             }
         } elseif ($this->propType !== '') {
             // Ensure that our basic non-empty type value is a real PHP type.

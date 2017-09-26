@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-namespace LazyJsonMapper\Exceptions;
+namespace LazyJsonMapper\Exception;
 
 /**
  * Means that there is a circular reference in the property map's imports.

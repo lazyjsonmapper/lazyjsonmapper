@@ -15,15 +15,15 @@
  * limitations under the License.
  */
 
-namespace LazyJsonMapper\Exceptions;
+namespace LazyJsonMapper\Exception;
 
 /**
- * Used when there is a bad/malformatted property map itself.
+ * Base class for all exceptions thrown by this library.
  *
  * @copyright 2017 The LazyJsonMapper Project
  * @license http://www.apache.org/licenses/LICENSE-2.0
  * @author SteveJobzniak (https://github.com/SteveJobzniak)
  */
-class BadPropertyMapException extends LazyJsonMapperException
+class LazyJsonMapperException extends \RuntimeException
 {
 }

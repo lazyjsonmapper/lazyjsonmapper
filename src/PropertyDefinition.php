@@ -17,7 +17,7 @@
 
 namespace LazyJsonMapper;
 
-use LazyJsonMapper\Exceptions\BadPropertyDefinitionException;
+use LazyJsonMapper\Exception\BadPropertyDefinitionException;
 use ReflectionClass;
 use ReflectionException;
 

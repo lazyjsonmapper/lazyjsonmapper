@@ -165,6 +165,24 @@ class PropertyDefinition
     }
 
     /**
+     * Get the property definition as its string representation.
+     *
+     * The string perfectly represents the property definition, and can
+     * therefore even be used when constructing other object instances.
+     *
+     * @return string
+     */
+    public function asString()
+    {
+        return sprintf(
+            '%s%s%s',
+            $this->isObjectType ? '\\' : '',
+            $this->propType,
+            str_repeat('[]', $this->arrayDepth)
+        );
+    }
+
+    /**
      * Get a shared, "undefined property" instance of this class.
      *
      * This function is great for memory purposes, since a single "undefined
@@ -188,5 +206,15 @@ class PropertyDefinition
         }
 
         return self::$_undefinedInstance;
+    }
+
+    /**
+     * Get the property definition as its string representation.
+     *
+     * @return string
+     */
+    public function __toString()
+    {
+        return $this->asString();
     }
 }

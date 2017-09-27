@@ -34,9 +34,6 @@ use ReflectionException;
  */
 class PropertyDefinition
 {
-    /** @var bool Whether this property was defined or is the untyped default. */
-    public $isUndefined;
-
     /**
      * Array-depth until we reach the typed values.
      *
@@ -50,10 +47,29 @@ class PropertyDefinition
      */
     public $arrayDepth;
 
-    /** @var string Assigned value-type for the property. */
+    /**
+     * Assigned value-type for the property.
+     *
+     * In case of basic PHP types, it is a string value such as "int".
+     *
+     * In case of classes, this is the cleaned up and correct namespace path,
+     * without the leading backslash. (Use $isObjectType to check for classes).
+     *
+     * Uses NULL to represent "mixed" or "" (mixed shorthand), to make it easy
+     * and fast to check for untyped properties via a "=== null" comparison.
+     *
+     * @var string|null
+     */
     public $propType;
 
-    /** @var bool Whether the type is a class object or a built-in type. */
+    /**
+     * Whether the type is a class object or a built-in type.
+     *
+     * Tip: If this value is true you can always trust $propType to be a string,
+     * representing the full namespace path of the target class.
+     *
+     * @var bool
+     */
     public $isObjectType;
 
     /**
@@ -70,25 +86,21 @@ class PropertyDefinition
      */
     private static $_basicTypes = ['bool', 'int', 'float', 'string'];
 
-    /** @var PropertyDefinition|null An internal, undefined instance of this class. */
-    private static $_undefinedInstance = null;
-
     /**
      * Constructor.
      *
      * @param string|null $definitionStr The string describing the property, or
-     *                                   NULL to create a default "undefined" property
+     *                                   NULL to create a default "untyped" property
      *
      * @throws BadPropertyDefinitionException If the provided definition is invalid.
      */
     public function __construct(
         $definitionStr = null)
     {
-        // Handle the creation of undefined properties.
+        // Handle the creation of untyped properties.
         if ($definitionStr === null) {
-            $this->isUndefined = true;
             $this->arrayDepth = 0;
-            $this->propType = '';
+            $this->propType = null;
             $this->isObjectType = false;
 
             return; // Skip the rest of the code.
@@ -97,8 +109,6 @@ class PropertyDefinition
         if (!is_string($definitionStr)) {
             throw new BadPropertyDefinitionException('The property definition must be a string value.');
         }
-
-        $this->isUndefined = false;
 
         // Set arrayDepth: Count well-formed array-brackets at end of type.
         // Example: "int[][][]" or "[][]" (yes, array of untyped is possible.)
@@ -111,11 +121,16 @@ class PropertyDefinition
         }
 
         // Set propType: It's what remains of our definition string.
-        // Example: "" or "int" or "\Foo\Bar"
+        // Example: "" or "mixed" or "int" or "\Foo\Bar"
         $this->propType = $definitionStr;
 
+        // Always store "" or "mixed" as NULL, to make it easy to check.
+        if ($this->propType === '' || $this->propType === 'mixed') {
+            $this->propType = null;
+        }
+
         // Determine whether the type refers to an object or a built-in type.
-        $this->isObjectType = ($this->propType !== '' && $this->propType[0] === '\\');
+        $this->isObjectType = ($this->propType !== null && $this->propType[0] === '\\');
 
         // Validate the type, to ensure that it's fully trustable when used.
         if ($this->isObjectType) {
@@ -146,7 +161,7 @@ class PropertyDefinition
             } catch (ReflectionException $e) {
                 throw new BadPropertyDefinitionException(sprintf('Reflection failed for class "%s". Reason: "%s".', $this->propType, $e->getMessage()));
             }
-        } elseif ($this->propType !== '') {
+        } elseif ($this->propType !== null) {
             // Ensure that our basic non-empty type value is a real PHP type.
             // NOTE: This is intentionally cAsE-sensitive.
             if (!in_array($this->propType, self::$_basicTypes)) {
@@ -182,35 +197,9 @@ class PropertyDefinition
         return sprintf(
             '%s%s%s',
             $this->isObjectType ? '\\' : '',
-            $this->propType,
+            $this->propType !== null ? $this->propType : 'mixed',
             str_repeat('[]', $this->arrayDepth)
         );
-    }
-
-    /**
-     * Get a shared, "undefined property" instance of this class.
-     *
-     * This function is great for memory purposes, since a single "undefined
-     * property" object instance can be shared across all code, without needing
-     * to allocate individual memory for any more instances of this class.
-     *
-     * WARNING: Because this class is optimized for LazyJsonMapper performance
-     * (avoiding function call/stack overhead by having public properties), it's
-     * extremely important that you do not modify ANY of the properties of this
-     * object instance when you get it, or you'll break EVERY shared copy! You
-     * are not supposed to manually edit any public property on this class
-     * anyway, as the class description explains, but it's even more important
-     * in this situation.
-     *
-     * @return PropertyDefinition
-     */
-    public static function getUndefinedInstance()
-    {
-        if (self::$_undefinedInstance === null) {
-            self::$_undefinedInstance = new self();
-        }
-
-        return self::$_undefinedInstance;
     }
 
     /**

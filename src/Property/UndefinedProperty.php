@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-namespace LazyJsonMapper;
+namespace LazyJsonMapper\Property;
 
 /**
  * Represents an "undefined" property which isn't in the user's class map.

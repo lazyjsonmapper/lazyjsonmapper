@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-namespace LazyJsonMapper;
+namespace LazyJsonMapper\Property;
 
 use LazyJsonMapper\Exception\BadPropertyDefinitionException;
+use LazyJsonMapper\LazyJsonMapper;
 use ReflectionClass;
 use ReflectionException;
 

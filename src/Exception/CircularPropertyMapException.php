@@ -58,7 +58,10 @@ class CircularPropertyMapException extends BadPropertyMapException
         $this->_badClassNameB = $badClassNameB;
 
         if ($badClassNameA !== null && $badClassNameB !== null) {
-            parent::__construct(sprintf('Circular reference between classes "%s" and "%s" in JSON property map import instruction.', $badClassNameA, $badClassNameB));
+            parent::__construct(sprintf(
+                'Circular reference between classes "%s" and "%s" in JSON property map import instruction.',
+                $badClassNameA, $badClassNameB
+            ));
         } else {
             parent::__construct('Circular reference in JSON property map import instruction.');
         }

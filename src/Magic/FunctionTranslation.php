@@ -84,7 +84,10 @@ class FunctionTranslation
         // Extract the components of the function name.
         $chunks = self::_explodeCamelCase($functionName);
         if ($chunks === false || count($chunks) < 2) {
-            throw new MagicTranslationException(sprintf('Invalid function name "%s".', $functionName));
+            throw new MagicTranslationException(sprintf(
+                'Invalid function name "%s".',
+                $functionName
+            ));
         }
 
         // Shift out the first chunk, containing function type (such as "get").

@@ -56,4 +56,18 @@ class PropertyMapCache
      * @var array
      */
     public $compilerLocks = [];
+
+    /**
+     * Clear the contents of the cache.
+     *
+     * Be aware that clearing the cache will only release OUR references to the
+     * compiled property maps. If there are any other variables linked to the
+     * contents of the cache, then those cache entries will NOT be freed by PHP
+     * until those additional variable references are garbage-collected.
+     */
+    public function clearCache()
+    {
+        $this->classMaps = [];
+        $this->compilerLocks = [];
+    }
 }

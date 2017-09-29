@@ -24,6 +24,6 @@ namespace LazyJsonMapper\Exceptions;
  * @license http://www.apache.org/licenses/LICENSE-2.0
  * @author SteveJobzniak (https://github.com/SteveJobzniak)
  */
-class BadPropertyMapException extends \RuntimeException
+class BadPropertyMapException extends LazyJsonMapperException
 {
 }

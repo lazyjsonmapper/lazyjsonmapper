@@ -18,12 +18,12 @@
 namespace LazyJsonMapper\Exceptions;
 
 /**
- * Used when there is a bad property definition which cannot be parsed.
+ * Base class for all exceptions thrown by this library.
  *
  * @copyright 2017 The LazyJsonMapper Project
  * @license http://www.apache.org/licenses/LICENSE-2.0
  * @author SteveJobzniak (https://github.com/SteveJobzniak)
  */
-class BadPropertyDefinitionException extends LazyJsonMapperException
+class LazyJsonMapperException extends \RuntimeException
 {
 }

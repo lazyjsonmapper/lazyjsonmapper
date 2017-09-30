@@ -50,11 +50,12 @@ class PropertyMapCompiler
      *
      * @param PropertyMapCache $propertyMapCache The cache to use for storage
      *                                           and lookups. Will be written to.
-     * @param string           $solveClassName   The full name of the class to
-     *                                           compile. To save time, we assume
-     *                                           that the caller has already
-     *                                           verified that it is a valid
-     *                                           LazyJsonMapper class.
+     * @param string           $solveClassName   The full path of the class to
+     *                                           compile, but without any
+     *                                           leading "\" global prefix. To
+     *                                           save time, we assume the caller
+     *                                           has already verified that it is
+     *                                           a valid LazyJsonMapper class.
      *
      * @throws BadPropertyDefinitionException If there is a problem with any of
      *                                        the property definitions.
@@ -80,7 +81,15 @@ class PropertyMapCompiler
             return; // Abort.
         }
 
-        // Update the property map cache to ensure the solve-class exists there.
+        // Generate a strict name (with a leading "\") to tell PHP to search for
+        // it from the global namespace, in commands where we need that.
+        // NOTE: We index the cache by "Foo\Bar" for easy lookups, since that is
+        // PHP's internal get_class()-style representation. But we use strict
+        // "\Foo\Bar" when we actually interact with a class or throw errors.
+        // That way, both PHP and the user understands that it's a global path.
+        $strictSolveClassName = self::createStrictClassPath($solveClassName);
+
+        // Let's compile the desired "solve-class", since it wasn't cached.
         // NOTE: This entire algorithm is EXCESSIVELY commented so that everyone
         // will understand it, since it's very complex thanks to its support for
         // inheritance and "multiple inheritance" (imports), which in turn uses
@@ -90,33 +99,42 @@ class PropertyMapCompiler
         // base-level class as the first element, and the solve-class as
         // the last element. (The order is important!)
         $classHierarchy = [];
-        $classReflectors = []; // Keep the reflectors for later re-use.
 
         try {
-            // Begin with the "solve-class" (and store its reflector).
-            $reflector = new ReflectionClass($solveClassName);
-            $classReflectors[$solveClassName] = $reflector;
-
-            // Add all parents in its inheritance ("extends") chain.
-            while (($parent = $reflector->getParentClass()) !== false) {
-                // Found a parent. Store it in the hierarchy.
-                $parentClassName = $parent->getName();
-                $classHierarchy[] = $parentClassName;
-
-                // Update the reflector variable to point at the parent,
-                // and also save its personal reflector for later re-use.
-                $reflector = $parent;
-                $classReflectors[$parentClassName] = $reflector;
+            // Begin reflecting the "solve-class". And completely refuse to
+            // proceed if the class name we were asked to solve doesn't match
+            // its EXACT real name. It's just a nice bonus check for safety,
+            // to ensure that our caller will be able to find their expected
+            // result in the correct cache key later.
+            $reflector = new ReflectionClass($strictSolveClassName);
+            if ($solveClassName !== $reflector->getName()) {
+                throw new BadPropertyMapException(sprintf(
+                    'Unable to compile class "%s" due to mismatched class name parameter value (the real class name is: "%s").',
+                    $strictSolveClassName, self::createStrictClassPath($reflector->getName())
+                ));
             }
 
-            // Reverse the list to fix the order, and then add ourselves.
-            $classHierarchy = array_reverse($classHierarchy);
-            $classHierarchy[] = $solveClassName;
+            // Now resolve all classes in its inheritance ("extends") chain.
+            do {
+                // Store the class in the hierarchy.
+                $classHierarchy[$reflector->getName()] = [
+                    'reflector'       => $reflector,
+                    'namespace'       => $reflector->getNamespaceName(),
+                    'strictClassName' => self::createStrictClassPath($reflector->getName()),
+                ];
+
+                // Update the reflector variable to point at the next
+                // parent class (or false if no more exists).
+                $reflector = $reflector->getParentClass();
+            } while ($reflector !== false);
+
+            // Reverse the list to fix the order, since we built it "bottom-up".
+            $classHierarchy = array_reverse($classHierarchy, true);
         } catch (ReflectionException $e) {
             // This should only be able to fail if the classname was invalid.
             throw new BadPropertyMapException(sprintf(
                 'Reflection of class hierarchy failed for class "%s". Reason: "%s".',
-                $solveClassName, $e->getMessage()
+                $strictSolveClassName, $e->getMessage()
             ));
         }
 
@@ -126,7 +144,7 @@ class PropertyMapCompiler
         // proceed with this compile. Otherwise we may partially lock things
         // and then suddenly throw an exception when we see a problem here.
         $ourCompilerClassLocks = [];
-        foreach ($classHierarchy as $className) {
+        foreach ($classHierarchy as $className => $classInfo) {
             // FATAL: If any part of our class hierarchy is already locked
             // ("is being compiled right now", higher up the call stack),
             // then it's a bad map with circular "import"-statements.
@@ -139,10 +157,13 @@ class PropertyMapCompiler
             if (isset($propertyMapCache->compilerLocks[$className])) {
                 // NOTE: $className goes in "arg1" because it's being
                 // compiled earlier than us, so we're definitely the "arg2".
-                throw new CircularPropertyMapException($className, $solveClassName);
+                throw new CircularPropertyMapException(
+                    $classInfo['strictClassName'],
+                    $strictSolveClassName
+                );
             }
 
-            // If the class isn't already compiled, lock it so that nothing
+            // If the class isn't already compiled, we'll lock it so nothing
             // else can refer to it. We'll lock every unresolved class, and
             // then we'll unlock them one by one as we resolve them during
             // THIS exact "compileClassPropertyMap()"-call. No other
@@ -182,7 +203,7 @@ class PropertyMapCompiler
         try {
             $currentClassPropertyMap = [];
             $previousConstantValue = null; // Used to detect unique consts.
-            foreach ($classHierarchy as $className) {
+            foreach ($classHierarchy as $className => $classInfo) {
                 // We must always begin by reflecting its "JSON_PROPERTY_MAP"
                 // class constant to determine if this particular class in
                 // the hierarchy re-defines it to a new value (compared to
@@ -192,13 +213,45 @@ class PropertyMapCompiler
                 // against "identical property re-definitions" further
                 // down, which means re-parsing would be safe but useless.)
                 try {
-                    $rawClassPropertyMap = $classReflectors[$className]->getConstant('JSON_PROPERTY_MAP');
+                    $rawClassPropertyMap = $classInfo['reflector']->getConstant('JSON_PROPERTY_MAP');
                     // MAGIC: The "!==" ensures that this constant differs
                     // from its parent. In case of arrays, they are only
                     // treated as identical if both arrays have the same
                     // key & value types and values in the exact same order
                     // and same count(). And it checks recursively.
                     $hasDifferentConstant = ($rawClassPropertyMap !== $previousConstantValue);
+
+                    // --------------------------------------------
+                    // TODO: When PHP 7.1 is more commonplace, add a check here
+                    // for "\ReflectionClassConstant", and if so instantiate one
+                    // and then look at getDeclaringClass() and update
+                    // $hasDifferentConstant based on its perfect answer.
+                    // - Why? To solve a very minor situation:
+                    // namespace A { class A { "foo":"B[]" } class B {} }
+                    // namespace Z { class Z extends \A\A { "foo":"B[]" } class B {} }
+                    // In that situation, Z would inherit the constant from A,
+                    // which compiled property "foo" as "\A\B". And when we look
+                    // at Z, we would see a 100% identical JSON_PROPERTY_MAP
+                    // constant, so we would assume that since all the fields
+                    // and values match, the constant was inherited. Therefore
+                    // the constant of Z will not be parsed. And Z's foo will
+                    // therefore also link to "\A\B", instead of "\Z\B".
+                    // - That situation is extremely rare, because I can't
+                    // imagine someone having such a poorly designed inheritance
+                    // that they inherit something which refers to a class via a
+                    // local relative path, and then re-define that property to
+                    // their own local relative path with the exact same name
+                    // and no other properties added/changed at all in the whole
+                    // map, thus making the maps look identical. It's just weird
+                    // on so many levels and unlikely to ever happen.
+                    // - However, we cannot solve this until PHP 7.1. Because
+                    // simply "always re-compile even if the constant was
+                    // inherited" would cause an insanely dangerous bug: All
+                    // relative class names would get re-interpreted by each
+                    // inheriting class. So no, we cannot simply always
+                    // re-compile. We'll instead have to live with this very
+                    // minor problem until PHP 7.1 is commonplace.
+                    // --------------------------------------------
 
                     // Update the "previous constant value" since we will
                     // be the new "previous" value after this iteration.
@@ -207,7 +260,7 @@ class PropertyMapCompiler
                     // Unable to read the map constant from the class...
                     throw new BadPropertyMapException(sprintf(
                         'Reflection of JSON_PROPERTY_MAP constant failed for class "%s". Reason: "%s".',
-                        $className, $e->getMessage()
+                        $classInfo['strictClassName'], $e->getMessage()
                     ));
                 }
 
@@ -241,7 +294,7 @@ class PropertyMapCompiler
                         if (!is_array($rawClassPropertyMap)) {
                             throw new BadPropertyMapException(sprintf(
                                 'Invalid JSON property map in class "%s". The map must be an array.',
-                                $className
+                                $classInfo['strictClassName']
                             ));
                         }
                         foreach ($rawClassPropertyMap as $propName => $propDefStr) {
@@ -257,7 +310,19 @@ class PropertyMapCompiler
                                 // definition is fully valid.
                                 try {
                                     // Validates the definition and throws if bad.
-                                    $propDefObj = new PropertyDefinition($propDefStr);
+                                    // NOTE: The namespace here is INCREDIBLY
+                                    // important. It's what allows each class to
+                                    // refer to classes relative to its own
+                                    // namespace, rather than needing to type
+                                    // the full, global class path. Without that
+                                    // parameter, the PropertyDefinition would
+                                    // only search in the global namespace.
+                                    // NOTE: "use" statements are ignored since
+                                    // PHP has no mechanism for inspecting those.
+                                    $propDefObj = new PropertyDefinition(
+                                        $propDefStr,
+                                        $classInfo['namespace']
+                                    );
 
                                     // MEMORY OPTIMIZATION TRICK: If we
                                     // wanted to be "naive", we could simply
@@ -315,13 +380,37 @@ class PropertyMapCompiler
                                     // Add details and throw from here instead.
                                     throw new BadPropertyDefinitionException(sprintf(
                                         'Bad property definition for "%s" in class "%s" (Error: "%s").',
-                                        $propName, $className, $e->getMessage()
+                                        $propName, $classInfo['strictClassName'], $e->getMessage()
                                     ));
                                 }
-                            } elseif (is_int($propName) && is_string($propDefStr)
-                                      && class_exists($propDefStr)
-                                      && is_subclass_of($propDefStr, LazyJsonMapper::class)) {
-                                // This is an "import other class" command!
+                            } else {
+                                // This is not a string key -> string value
+                                // pair, so let's check for "import class map".
+                                $isImportCommand = false;
+                                $importClassName = null;
+                                $strictImportClassName = null; // With "\" prefix.
+                                if (is_int($propName) && is_string($propDefStr)) {
+                                    // Potential import... we must first ensure
+                                    // that the class has a global "\" prefix.
+                                    $importClassName = $propDefStr;
+                                    $strictImportClassName = self::createStrictClassPath($importClassName);
+
+                                    // Now check if the target class fits the
+                                    // "import class" requirements.
+                                    if (class_exists($strictImportClassName)
+                                        && is_subclass_of($strictImportClassName, LazyJsonMapper::class)) {
+                                        $isImportCommand = true;
+                                    }
+                                }
+                                if (!$isImportCommand) {
+                                    // This map-array value is definitely NOT okay.
+                                    throw new BadPropertyMapException(sprintf(
+                                        'Invalid JSON property map entry "%s" in class "%s".',
+                                        $propName, $classInfo['strictClassName']
+                                    ));
+                                }
+
+                                // This was an "import other class" command!
                                 // They exist in the map and tell us to
                                 // import other classes, and the instructions
                                 // are written as [OtherClass::class,
@@ -347,14 +436,18 @@ class PropertyMapCompiler
                                 // name of the class they want to import,
                                 // so that we can trust its name completely.
                                 try {
-                                    $reflector = new ReflectionClass($propDefStr);
+                                    // Note: The strict, global "\"-name is
+                                    // necessary to guarantee that we find the
+                                    // correct target class.
+                                    $reflector = new ReflectionClass($strictImportClassName);
                                     $importClassName = $reflector->getName();
+                                    $strictImportClassName = self::createStrictClassPath($importClassName);
                                 } catch (ReflectionException $e) {
                                     // This should never be able to fail,
                                     // but if it does, treat it as a bad map.
                                     throw new BadPropertyMapException(sprintf(
                                         'Reflection failed for class "%s", when trying to import it into class "%s". Reason: "%s".',
-                                        $propDefStr, $className, $e->getMessage()
+                                        $strictImportClassName, $classInfo['strictClassName'], $e->getMessage()
                                     ));
                                 }
 
@@ -382,12 +475,15 @@ class PropertyMapCompiler
                                 // "B" is locked as "already being resolved",
                                 // since the ongoing resolving of "B" was
                                 // what triggered the compilation of "D".
-                                if (in_array($importClassName, $classHierarchy)) {
+                                if (array_key_exists($importClassName, $classHierarchy)) {
                                     // NOTE: $solveClassName goes in "arg1"
                                     // because we're the ones trying to
                                     // import an invalid target class that's
                                     // already part of our own hierarchy.
-                                    throw new CircularPropertyMapException($solveClassName, $importClassName);
+                                    throw new CircularPropertyMapException(
+                                        $strictSolveClassName,
+                                        $strictImportClassName
+                                    );
                                 }
 
                                 // FATAL: Also prevent users from importing any
@@ -443,14 +539,17 @@ class PropertyMapCompiler
                                 // exception now instead of letting "A"
                                 // attempt to compile itself a second time
                                 // as described above. The result of this
-                                // early sanity-check is .
+                                // early sanity-check is a better error msg.
                                 foreach ($propertyMapCache->compilerLocks as $lockedClassName => $isLocked) {
                                     if ($isLocked && $lockedClassName === $importClassName) {
                                         // NOTE: $solveClassName goes in "arg2"
                                         // because we're trying to import
                                         // something unresolved that's therefore
                                         // higher than us in the call-stack.
-                                        throw new CircularPropertyMapException($importClassName, $solveClassName);
+                                        throw new CircularPropertyMapException(
+                                            $strictImportClassName,
+                                            $strictSolveClassName
+                                        );
                                     }
                                 }
 
@@ -488,11 +587,11 @@ class PropertyMapCompiler
                                 // our target class should be in the cache since
                                 // its compilation ran successfully (or it was
                                 // already cached). Just verify it to be safe.
-                                // NOTE: This code should never be able to run.
+                                // NOTE: This step should never go wrong.
                                 if (!isset($propertyMapCache->classMaps[$importClassName])) {
                                     throw new BadPropertyMapException(sprintf(
                                         'Unable to resolve property map for class "%s", when trying to import it into class "%s".',
-                                        $importClassName, $className
+                                        $strictImportClassName, $classInfo['strictClassName']
                                     ));
                                 }
 
@@ -513,12 +612,6 @@ class PropertyMapCompiler
                                 foreach ($propertyMapCache->classMaps[$importClassName] as $importedPropName => $importedPropDefObj) {
                                     $currentClassPropertyMap[$importedPropName] = $importedPropDefObj;
                                 }
-                            } else {
-                                // This map-array value is definitely NOT okay.
-                                throw new BadPropertyMapException(sprintf(
-                                    'Invalid JSON property map entry "%s" in class "%s".',
-                                    $propName, $className
-                                ));
                             } // End of user map-value data validation.
                         } // End of "JSON_PROPERTY_MAP" array-variable loop.
                     } // End of "class has different constant" code block.
@@ -558,5 +651,31 @@ class PropertyMapCompiler
                 unset($propertyMapCache->compilerLocks[$lockedClassName]);
             }
         } // End of try-finally.
+    }
+
+    /**
+     * Create a strict, global class path.
+     *
+     * This helper ensures that the input is a non-empty string, and then
+     * automatically prepends a leading "\" if missing, so that PHP understands
+     * that the class search MUST happen only in the global namespace.
+     *
+     * @param string $className The class name to convert.
+     *
+     * @return string|null String if non-empty string input, otherwise NULL.
+     */
+    public static function createStrictClassPath(
+        $className = '')
+    {
+        if (is_string($className) && strlen($className) > 0) {
+            // Prepend "\" if missing, to force PHP to use the global namespace.
+            if ($className[0] !== '\\') {
+                $className = '\\'.$className;
+            }
+
+            return $className;
+        }
+
+        return null;
     }
 }

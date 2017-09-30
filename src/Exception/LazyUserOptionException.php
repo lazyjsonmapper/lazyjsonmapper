@@ -17,22 +17,20 @@
 
 namespace LazyJsonMapper\Exception;
 
+use LazyJsonMapper\LazyJsonMapper;
+
 /**
- * Describes that an error happened in user-written subclass code or options.
+ * Means that a user-option constant prevented normal execution.
  *
- * This exception is never purposefully thrown by the core LazyJsonMapper
- * class by default. It's only thrown if problems happen in subclass code or
- * if there are problems related to the user-class options.
- *
- * Currently, that's only possible in the LazyJsonMapper::_init() function,
- * or when the user has overridden certain user-class options away from
- * the default values and then attempts to perform an action affected by
- * their non-standard class option.
+ * This is used for actions that would not normally be errors, but whose
+ * behaviors have been modified by user-option constants for the current
+ * class object instance. Such as attempting to perform actions forbidden
+ * by the user's customized options.
  *
  * @copyright 2017 The LazyJsonMapper Project
  * @license http://www.apache.org/licenses/LICENSE-2.0
  * @author SteveJobzniak (https://github.com/SteveJobzniak)
  */
-class LazyUserException extends LazyJsonMapperException
+class LazyUserOptionException extends LazyUserException
 {
 }

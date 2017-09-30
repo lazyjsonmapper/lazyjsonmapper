@@ -53,21 +53,29 @@ class PropertyDefinition
      *
      * In case of basic PHP types, it is a string value such as "int".
      *
-     * In case of classes, this is the cleaned up and correct namespace path,
-     * without the leading backslash. (Use $isObjectType to check for classes).
-     *
-     * Uses NULL to represent "mixed" or "" (mixed shorthand), to make it easy
+     * It uses NULL to represent "mixed" or "" (mixed shorthand) to make it easy
      * and fast to check for untyped properties via a "=== null" comparison.
      *
+     * In case of classes, this is the normalized namespace+class path, but
+     * WITHOUT any initial leading "look from the global namespace" backslash.
+     * That's PHP's preferred notation for class paths in all of its various
+     * "get name" functions. However, that's very unsafe for actual object
+     * creation, since PHP would first try resolving to a relative object.
+     * Therefore, use getStrictClassPath() for actual creation or strict
+     * comparisons where any kind of namespace resolution will be involved,
+     * such as "is_a()" or "is_subclass_of()", etc!
+     *
      * @var string|null
+     *
+     * @see PropertyDefinition::getStrictClassPath()
      */
     public $propType;
 
     /**
      * Whether the type is a class object or a built-in type.
      *
-     * Tip: If this value is true you can always trust $propType to be a string,
-     * representing the full namespace path of the target class.
+     * Tip: If this value is true you can always trust $propType to be a string
+     * representing the normalized namespace+class path to the target class.
      *
      * @var bool
      */
@@ -85,18 +93,24 @@ class PropertyDefinition
      *
      * @var string[]
      */
-    private static $_basicTypes = ['bool', 'int', 'float', 'string'];
+    const BASIC_TYPES = ['bool', 'int', 'float', 'string'];
 
     /**
      * Constructor.
      *
      * @param string|null $definitionStr The string describing the property, or
      *                                   NULL to create a default "untyped" property
+     * @param string|null $baseNamespace Namespace to use for resolving relative
+     *                                   class paths. It CANNOT start or end with
+     *                                   a backslash. (Use __NAMESPACE__ format).
+     *                                   If no namespace is provided, all classes
+     *                                   are assumed to be relative to global.
      *
      * @throws BadPropertyDefinitionException If the provided definition is invalid.
      */
     public function __construct(
-        $definitionStr = null)
+        $definitionStr = null,
+        $baseNamespace = '')
     {
         // Handle the creation of untyped properties.
         if ($definitionStr === null) {
@@ -113,6 +127,22 @@ class PropertyDefinition
             );
         }
 
+        // Clean up and validate any provided base namespace or make it global.
+        // IMPORTANT NOTE: Any provided classnames "relative to a certain
+        // namespace" will NOT know about any "use"-statements in the files
+        // where those classes are defined. Even Reflection cannot detect "use".
+        if (is_string($baseNamespace)) { // Custom namespace.
+            if (strlen($baseNamespace) > 0
+                && ($baseNamespace[0] === '\\' || substr($baseNamespace, -1) === '\\')) {
+                throw new BadPropertyDefinitionException(sprintf(
+                    'Invalid namespace "%s". The namespace is not allowed to start or end with a backslash. Use __NAMESPACE__ format.',
+                    $baseNamespace
+                ));
+            }
+        } else {
+            $baseNamespace = ''; // Global namespace.
+        }
+
         // Set arrayDepth: Count well-formed array-brackets at end of type.
         // Example: "int[][][]" or "[][]" (yes, array of untyped is possible.)
         $this->arrayDepth = 0;
@@ -124,7 +154,7 @@ class PropertyDefinition
         }
 
         // Set propType: It's what remains of our definition string.
-        // Example: "" or "mixed" or "int" or "\Foo\Bar"
+        // Example: "" or "mixed" or "int" or "\Foo\Bar" or "Bar"
         $this->propType = $definitionStr;
 
         // Always store "" or "mixed" as NULL, to make it easy to check.
@@ -132,57 +162,107 @@ class PropertyDefinition
             $this->propType = null;
         }
 
-        // Determine whether the type refers to an object or a built-in type.
-        $this->isObjectType = ($this->propType !== null && $this->propType[0] === '\\');
+        // If there's no type, or if it refers to a basic type, then we're done.
+        // This ensures that our basic non-empty type value is a real PHP type.
+        // NOTE: This is intentionally cAsE-sensitive.
+        // NOTE: The basic types are reserved names in PHP, so there's no risk
+        // they refer to classes, since PHP doesn't allow such class names.
+        if ($this->propType === null || in_array($this->propType, self::BASIC_TYPES)) {
+            $this->isObjectType = false;
 
-        // Validate the type, to ensure that it's fully trustable when used.
-        if ($this->isObjectType) {
-            // Ensure that the target class actually exists (via autoloader).
-            if (!class_exists($this->propType)) {
-                throw new BadPropertyDefinitionException(sprintf(
-                    'Class "%s" not found.',
-                    $this->propType
-                ));
-            }
-
-            // We'll use a reflector for analysis, to ensure the class is valid.
-            try {
-                // First clean up the case-insensitive class name to become the
-                // EXACT name for the class. So we can trust "propType" in ===.
-                // Example: "\fOO\bAr" to "Foo\Bar" (notice leading \ vanishes).
-                $reflector = new ReflectionClass($this->propType);
-                $this->propType = $reflector->getName();
-
-                // The target class or its parents MUST inherit LazyJsonMapper,
-                // so it implements the necessary behaviors and can be trusted
-                // to accept our standardized constructor parameters.
-                // NOTE: As you can see, we also allow users to map directly to
-                // plain "LazyJsonMapper" objects. It's a very bad idea, since
-                // they don't get any property definitions, and therefore their
-                // object would be unreliable. But that's the user's choice.
-                if ($this->propType !== LazyJsonMapper::class
-                    && !$reflector->isSubClassOf(LazyJsonMapper::class)) {
-                    throw new BadPropertyDefinitionException(sprintf(
-                        'Class "%s" must inherit from LazyJsonMapper.',
-                        $this->propType
-                    ));
-                }
-            } catch (ReflectionException $e) {
-                throw new BadPropertyDefinitionException(sprintf(
-                    'Reflection failed for class "%s". Reason: "%s".',
-                    $this->propType, $e->getMessage()
-                ));
-            }
-        } elseif ($this->propType !== null) {
-            // Ensure that our basic non-empty type value is a real PHP type.
-            // NOTE: This is intentionally cAsE-sensitive.
-            if (!in_array($this->propType, self::$_basicTypes)) {
-                throw new BadPropertyDefinitionException(sprintf(
-                    'Invalid property type "%s".',
-                    $this->propType
-                ));
-            }
+            return; // Skip the rest of the code.
         }
+
+        // They are trying to refer to a class (or they've mistyped a basic
+        // type). Validate the target to ensure that it's fully trustable
+        // to be a reachable LazyJsonMapper-based class.
+        $this->isObjectType = true;
+
+        // Begin by copying whatever remaining type value they've provided...
+        $classPath = $this->propType;
+
+        // First check if they want the global namespace instead.
+        if ($classPath[0] === '\\') {
+            // Their class refers to a global path.
+            $baseNamespace = ''; // Set global namespace as base.
+            $classPath = substr($classPath, 1); // Strip leading "\".
+        }
+
+        // Construct the full class-path from their base namespace and class.
+        // NOTE: The leading backslash is super important to ensure that PHP
+        // actually looks in the target namespace instead of a sub-namespace
+        // of its current namespace.
+        $fullClassPath = sprintf(
+            '\\%s%s%s',
+            $baseNamespace,
+            $baseNamespace !== '' ? '\\' : '',
+            $classPath
+        );
+
+        // Ensure that the target class actually exists (via autoloader).
+        if (!class_exists($fullClassPath)) {
+            throw new BadPropertyDefinitionException(sprintf(
+                'Class "%s" not found.',
+                $fullClassPath
+            ));
+        }
+
+        // We'll use a reflector for analysis, to ensure the class is valid
+        // for use as a target type. It must be based on LazyJsonMapper.
+        try {
+            // First clean up the case-insensitive class name to become the
+            // EXACT name for the class. So we can trust "propType" in ===.
+            // Example: "\fOO\bAr" to "Foo\Bar". (Without any leading "\".)
+            // NOTE: getName() gets the namespace+class without leading "\",
+            // which is PHP's preferred notation. And that is exactly how we
+            // will store the final path internally, so that we can always
+            // trust comparisons of these typenames vs full paths to other
+            // class names retrieved via other methods such as get_class().
+            // It does however mean that propType is NOT the right value for
+            // actually constructing the class safely.
+            $reflector = new ReflectionClass($fullClassPath);
+            $fullClassPath = $reflector->getName();
+
+            // The target class or its parents MUST inherit LazyJsonMapper,
+            // so that it implements the necessary behaviors and can be
+            // trusted to accept our standardized constructor parameters.
+            // NOTE: As you can see, we also allow users to map directly to
+            // plain "LazyJsonMapper" objects. It's a very bad idea, since
+            // they don't get any property definitions, and therefore their
+            // object would be unreliable. But that's the user's choice.
+            if ($fullClassPath !== LazyJsonMapper::class
+                && !$reflector->isSubClassOf(LazyJsonMapper::class)) {
+                throw new BadPropertyDefinitionException(sprintf(
+                    'Class "\\%s" must inherit from LazyJsonMapper.',
+                    $fullClassPath
+                ));
+            }
+
+            // Alright, the class path has been fully resolved, validated
+            // to be a LazyJsonMapper, and normalized into its correct name.
+            // ... Rock on! ;-)
+            $this->propType = $fullClassPath;
+        } catch (ReflectionException $e) {
+            throw new BadPropertyDefinitionException(sprintf(
+                'Reflection failed for class "%s". Reason: "%s".',
+                $fullClassPath, $e->getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Get the strict, global path to the target class.
+     *
+     * Always use this function when creating objects or in any other way using
+     * the "property type" class path as argument for PHP's class checking
+     * functions. The strict path that it returns ensures that PHP will find
+     * the global path instead of resolving to a local object.
+     *
+     * @return string|null Strict path if this is an object, otherwise NULL.
+     */
+    public function getStrictClassPath()
+    {
+        return $this->isObjectType ? '\\'.$this->propType : null;
     }
 
     /**

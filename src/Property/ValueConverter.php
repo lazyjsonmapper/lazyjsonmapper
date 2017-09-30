@@ -85,66 +85,6 @@ class ValueConverter
         // Do nothing if this particular value is NULL.
         if ($value === null) {
             return; // Skip the rest of the code.
-        } elseif ($propDef->propType === null) {
-            // This is a non-NULL but "untyped" property, which means that we
-            // only accept three things: NULL, Scalars (int, float, string,
-            // bool) and non-associative arrays of those. We will NOT allow
-            // any Objects, external Resources or associative arrays.
-
-            // We've already checked NULL above. Check the most common types
-            // first. Almost all untyped values will be one of these, which
-            // means that even untyped properties are blazingly fast to process.
-            if (is_scalar($value)) { // int, float, string, bool
-                return; // Scalar accepted. Skip the rest of the code.
-            }
-
-            // Alright... then it's either an array, Object or Resource.
-            try {
-                if (is_array($value)) {
-                    // Verify the array contents.
-                    array_walk_recursive($value, function ($v/*, $k*/) {
-                        // Also verify that all of its array keys are integers,
-                        // since JSON does not allow associative arrays on
-                        // non-object properties.
-                        // NOTE: Key-check has been disabled since untyped
-                        // properties may contain object data, which PHP
-                        // translates to associative arrays, and we WANT to
-                        // allow people to access those unmapped object
-                        // properties and read them like assoc arrays. And
-                        // besides, the key-checking here was improper since it
-                        // didn't verify the actual sequence. So we'll only
-                        // verify untyped array VALUES. If the user manages to
-                        // break key sequencing in a numeric array then that's
-                        // THEIR problem and they should just switch to typed
-                        // properties to get full key-type checking.
-                        //
-                        // if (!is_int($k)) { // Illegal non-numeric key?
-                        //     throw new LazyJsonMapperException();
-                        // }
-                        if ($v !== null && !is_scalar($v)) {
-                            // Found bad (non-NULL, non-scalar) inner value.
-                            throw new LazyJsonMapperException();
-                        }
-                    });
-                } else {
-                    // Their value is an Object or Resource.
-                    throw new LazyJsonMapperException();
-                }
-            } catch (LazyJsonMapperException $e) {
-                throw new LazyJsonMapperException(sprintf(
-                    // Let's try to be REALLY clear so the user understands...
-                    // Since I anticipate lots of untyped user properties.
-                    '%s untyped property "%s". Untyped properties can only contain NULL or scalar values (int, float, string, bool), or arrays holding any mixture of those types.',
-                    ($direction === self::CONVERT_FROM_INTERNAL
-                     ? 'Unexpected value in'
-                     : 'Unable to assign invalid new value for'),
-                    $propName
-                ));
-            }
-
-            // If we've come this far, their untyped property contained a valid
-            // array with only NULL/scalars (or nothing at all) inside.
-            return; // Skip the rest of the code.
         }
 
         // Handle "arrays of [type]" by recursively processing all layers down
@@ -154,6 +94,10 @@ class ValueConverter
         // a sequential order starting from element 0, without any gaps.
         // Otherwise the item is invalid JSON, since json_encode() treats gaps
         // in numeric arrays as objects "{"5":99}" instead of arrays "[99]".
+        // NOTE: We even support "arrays of mixed", and in that case will verify
+        // that the mixed data is at the expected depth and has key integrity.
+        // So specifying "mixed[]" requires data like "[1,null,true]", whereas
+        // specifying "mixed" avoids doing any depth validation.
         if ($remArrayDepth > 0) {
             if (!is_array($value)) {
                 if ($direction === self::CONVERT_FROM_INTERNAL) {
@@ -198,10 +142,12 @@ class ValueConverter
 
                 // The key was valid, so convert() any sub-values within this
                 // value. Its next depth is either 0 (values) or 1+ (more arrays).
-                if ($direction === self::CONVERT_FROM_INTERNAL) {
-                    self::convert($direction, $v, $newRemArrayDepth, $propName, $propDef);
-                } else {
-                    self::convert($direction, $v, $newRemArrayDepth, $propName, $propDef);
+                if ($v !== null) { // OPTIMIZATION: Avoid useless call if null.
+                    if ($direction === self::CONVERT_FROM_INTERNAL) {
+                        self::convert($direction, $v, $newRemArrayDepth, $propName, $propDef);
+                    } else {
+                        self::convert($direction, $v, $newRemArrayDepth, $propName, $propDef);
+                    }
                 }
             }
 
@@ -209,12 +155,97 @@ class ValueConverter
             return;
         } // End of "remaining array depth" handler.
 
+        // Alright, we now know that we're at the "data depth". However, the
+        // property itself may be untyped ("mixed"). Handle that first.
+        if ($propDef->propType === null) {
+            // This is a non-NULL but "untyped" property, which means that we
+            // only accept three things: NULL, Scalars (int, float, string,
+            // bool) and arrays of those. We will NOT allow any Objects or
+            // external Resources. And arrays at this level will only be
+            // allowed if the "mixed" type didn't specify any depth.
+
+            // We've already checked NULL earlier. Check the most common data
+            // types now. Almost all untyped values will be one of these,
+            // meaning even untyped properties are blazingly fast to process.
+            if (is_scalar($value)) { // int, float, string, bool
+                return; // Scalar accepted. Skip the rest of the code.
+            }
+
+            // Alright... then it's either an array, Object or Resource.
+            try {
+                if (is_array($value)) {
+                    // Forbid arrays at this "value-level" if this was a
+                    // "mixed[]" notation untyped property, since the "[]"
+                    // specifies the maximum mixed data depth in that case.
+                    // TODO: We do not have any PropertyDefinition notation
+                    // for specifying "mixed non-array property". Perhaps add
+                    // that feature someday, maybe "mixed[-]", since "mixed[]"
+                    // is already taken by "1-level deep mixed" and "mixed" is
+                    // already taken by "do not check depth of this mixed data".
+                    // It would be nice to be able to say that a mixed property
+                    // can contain any basic type but not arrays.
+                    // A simple implementation would be that arrayDepth "-1"
+                    // for mixed denotes "do not check array depth" ("mixed")
+                    // and "0" denotes "check array depth" ("mixed[-]").
+                    // Either way, the syntax also needs to be valid PHPdoc so
+                    // that the automatic property signatures are valid.
+                    if ($propDef->arrayDepth > 0) {
+                        // This "mixed" type specifies a max-depth, which means
+                        // that we've reached it. We cannot allow more arrays.
+                        throw new LazyJsonMapperException(sprintf(
+                            // Let's try to be REALLY clear so the user understands...
+                            // Since I anticipate lots of untyped user properties.
+                            '%s non-array inner untyped property of "%s". This untyped property specifies a maximum array depth of %d.',
+                            ($direction === self::CONVERT_FROM_INTERNAL
+                             ? 'Unexpected inner array value in'
+                             : 'Unable to assign new inner array value for'),
+                            $propName, $propDef->arrayDepth
+                        ));
+                    }
+
+                    // This mixed property has no max depth. Just verify the
+                    // contents recursively to ensure it has no invalid data.
+                    array_walk_recursive($value, function ($v) {
+                        // NOTE: Mixed properties without max-depth can be
+                        // either JSON objects or JSON arrays, and we don't know
+                        // which, so we cannot verify their array key-type. If
+                        // people want validation of keys, they should set a max
+                        // depth for their mixed property OR switch to typed.
+                        if ($v !== null && !is_scalar($v)) {
+                            // Found bad (non-NULL, non-scalar) inner value.
+                            throw new LazyJsonMapperException('bad_inner_type');
+                        }
+                    });
+                } else {
+                    // Their value is an Object or Resource.
+                    throw new LazyJsonMapperException('bad_inner_type');
+                }
+            } catch (LazyJsonMapperException $e) {
+                // Automatically select appropriate exception message.
+                if ($e->getMessage() !== 'bad_inner_type') {
+                    throw $e; // Re-throw since it already had a message.
+                }
+
+                throw new LazyJsonMapperException(sprintf(
+                    // Let's try to be REALLY clear so the user understands...
+                    // Since I anticipate lots of untyped user properties.
+                    '%s untyped property "%s". Untyped properties can only contain NULL or scalar values (int, float, string, bool), or arrays holding any mixture of those types.',
+                    ($direction === self::CONVERT_FROM_INTERNAL
+                     ? 'Unexpected value in'
+                     : 'Unable to assign invalid new value for'),
+                    $propName
+                ));
+            }
+
+            // If we've come this far, their untyped property contained a valid
+            // array with only NULL/scalars (or nothing at all) inside. Done!
+            return; // Skip the rest of the code.
+        }
+
         // Alright... we know that we're at the "data depth" and that $value
-        // refers to a single non-NULL, strongly typed value. We will now do
-        // inline data validation (these could be a separate "process value"
-        // function but we'd cost 1 extra function call per value in that case).
+        // refers to a single non-NULL, strongly typed value...
         if ($direction === self::CONVERT_TO_INTERNAL) {
-            // No incoming value is allowed to be array anymore at this depth...
+            // No incoming value is allowed to be array anymore at this depth.
             if (is_array($value)) {
                 throw new LazyJsonMapperException(sprintf(
                     'Unable to assign new inner array value for non-array inner property of "%s", which must be of type "%s".',

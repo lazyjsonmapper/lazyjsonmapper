@@ -34,16 +34,24 @@ class ValueConverter
     /**
      * Validate and convert an incoming or outgoing object data property.
      *
-     * If any value is a literal NULL or no type-conversion is assigned, then it
-     * will be accepted as-is instead of being validated/converted to another type.
+     * If any value is a literal NULL, it will be accepted as-is.
      *
-     * If the input is an array of values, all values in the array will be
-     * processed recursively to the specified array-depth. However, note that we
-     * don't ENFORCE that an array MUST be a certain depth. We'll just traverse
-     * down to that depth, if it exists, and then ensure that all array-values
-     * at THAT depth are of the correct type.
+     * If no type-conversion is assigned to a value, then it will undergo a
+     * check to verify that it only holds basic PHP types (int, float, string,
+     * bool or NULL), or arrays of those types. Also note that untyped values
+     * with an array-depth specifier will undergo strict depth validation just
+     * like any other typed value.
      *
-     * Conversion behavior depends on the data direction:
+     * In all cases where the input type is specified to be an array of values,
+     * all values in the array will be processed recursively to the specified
+     * array-depth and validated to conform to JSON array standards (sequential,
+     * numeric array keys). However, note that we don't ENFORCE that an array
+     * MUST be as deep as the specified depth. We'll just traverse down all the
+     * way to that depth, while verifying that everything on the way there is
+     * valid. And we then finally ensure that all values at the specified final
+     * depth are of the correct type.
+     *
+     * Type conversion behavior depends on the data direction:
      *
      * Incoming (CONVERT_TO_INTERNAL):
      *
@@ -87,13 +95,23 @@ class ValueConverter
             return; // Skip the rest of the code.
         }
 
+        // ------------
+        // TODO: Improve all error messages below to make them more
+        // human-readable. Perhaps even display $propDef->asString() as a great
+        // hint about what type the property requires, even indicating what array
+        // depth it must be at. However, the current messages about problems at
+        // "at array-depth X of Y" should be kept, since that level of detail is
+        // very helpful for figuring out which part of the array is bad.
+        // ------------
+
         // Handle "arrays of [type]" by recursively processing all layers down
         // until the array-depth, and verifying all keys and values.
         // NOTE: If array depth remains, we ONLY allow arrays (or NULLs above),
-        // and all of the arrays until the depth MUST be numerically indexed in
-        // a sequential order starting from element 0, without any gaps.
-        // Otherwise the item is invalid JSON, since json_encode() treats gaps
-        // in numeric arrays as objects "{"5":99}" instead of arrays "[99]".
+        // and ALL of the arrays until the depth MUST be numerically indexed in
+        // a sequential order starting from element 0, without any gaps. Because
+        // the ONLY way that a value can be a true JSON ARRAY is if the keys are
+        // numeric and sequential. Otherwise the "array" we are looking at was
+        // originally a JSON OBJECT in the original, pre-json_decode()-d string.
         // NOTE: We even support "arrays of mixed", and in that case will verify
         // that the mixed data is at the expected depth and has key integrity.
         // So specifying "mixed[]" requires data like "[1,null,true]", whereas
@@ -174,21 +192,31 @@ class ValueConverter
             // Alright... then it's either an array, Object or Resource.
             try {
                 if (is_array($value)) {
-                    // Forbid arrays at this "value-level" if this was a
-                    // "mixed[]" notation untyped property, since the "[]"
+                    // Forbid arrays at this "value-level" IF and only if this
+                    // was a "mixed[]" notation untyped property, since the "[]"
                     // specifies the maximum mixed data depth in that case.
+                    // ------------------------------------------
                     // TODO: We do not have any PropertyDefinition notation
                     // for specifying "mixed non-array property". Perhaps add
                     // that feature someday, maybe "mixed[-]", since "mixed[]"
                     // is already taken by "1-level deep mixed" and "mixed" is
                     // already taken by "do not check depth of this mixed data".
                     // It would be nice to be able to say that a mixed property
-                    // can contain any basic type but not arrays.
+                    // "can contain any basic type but not arrays".
                     // A simple implementation would be that arrayDepth "-1"
                     // for mixed denotes "do not check array depth" ("mixed")
                     // and "0" denotes "check array depth" ("mixed[-]").
                     // Either way, the syntax also needs to be valid PHPdoc so
-                    // that the automatic property signatures are valid.
+                    // that the automatic property signatures are valid, so we
+                    // actually cannot use "mixed[-]". Perhaps I'm overthinking
+                    // all of this, though. Because if the user cares about the
+                    // depth of untyped (mixed) properties, they should know
+                    // enough to just strongly type-assign something instead.
+                    // Although, perhaps this IS a job for PropertyDefinition:
+                    // If the user specifies "mixed[-]" we can store it as
+                    // untyped with arrayDepth -1, but output it as "mixed" when
+                    // converting that PropertyDefinition to signature hints.
+                    // ------------------------------------------
                     if ($propDef->arrayDepth > 0) {
                         // This "mixed" type specifies a max-depth, which means
                         // that we've reached it. We cannot allow more arrays.
@@ -242,6 +270,10 @@ class ValueConverter
             return; // Skip the rest of the code.
         }
 
+        // We need the strict classpath for all object comparisons, to ensure
+        // that we always compare against the right class via global namespace.
+        $strictClassPath = $propDef->isObjectType ? $propDef->getStrictClassPath() : null;
+
         // Alright... we know that we're at the "data depth" and that $value
         // refers to a single non-NULL, strongly typed value...
         if ($direction === self::CONVERT_TO_INTERNAL) {
@@ -249,13 +281,21 @@ class ValueConverter
             if (is_array($value)) {
                 throw new LazyJsonMapperException(sprintf(
                     'Unable to assign new inner array value for non-array inner property of "%s", which must be of type "%s".',
-                    $propName, $propDef->propType
+                    $propName, $propDef->isObjectType ? $strictClassPath : $propDef->propType
                 ));
             }
 
             // Now convert the provided individual value, as necessary...
             if (!$propDef->isObjectType) {
                 // Cast the value to the target built-in PHP type. We cannot cast objects.
+                // NOTE: For performance, we don't check is_resource(), because
+                // those should never be able to appear in somebody's data. And
+                // they can actually be cast to any basic PHP type without any
+                // problems at all. It's only objects that are a problem and
+                // cannot have any "settype()" applied to them by PHP.
+                // Furthermore, is_resource() isn't even reliable anyway, since
+                // it returns false if it is a closed resource. So whatever,
+                // just rely on the fact that PHP can convert it to basic types.
                 if (is_object($value) || !@settype($value, $propDef->propType)) {
                     throw new LazyJsonMapperException(sprintf(
                         'Unable to cast new inner value for property "%s" to built-in PHP type "%s".',
@@ -267,10 +307,10 @@ class ValueConverter
                 // of the exact required class (or at least a subclass of it).
                 // NOTE: Since all PropertyDefinition types are validated to derive
                 // from LazyJsonMapper, we don't need to check "instanceof".
-                if (!is_object($value) || !is_a($value, $propDef->propType)) {
+                if (!is_object($value) || !is_a($value, $strictClassPath)) {
                     throw new LazyJsonMapperException(sprintf(
                         'The new inner value for property "%s" must be an instance of class "%s".',
-                        $propName, $propDef->propType
+                        $propName, $strictClassPath
                     ));
                 }
             }
@@ -294,6 +334,7 @@ class ValueConverter
                 }
 
                 // Cast the value to the target built-in PHP type. We cannot cast objects.
+                // NOTE: If resources appear in the data, they'll be castable by settype().
                 if (is_object($value) || !@settype($value, $propDef->propType)) {
                     throw new LazyJsonMapperException(sprintf(
                         'Unable to cast inner value for property "%s" to built-in PHP type "%s".',
@@ -308,7 +349,7 @@ class ValueConverter
                     if (!is_array($value)) {
                         throw new LazyJsonMapperException(sprintf(
                             'Unable to convert non-array inner value for property "%s" into class "%s".',
-                            $propName, $propDef->propType
+                            $propName, $strictClassPath
                         ));
                     }
 
@@ -328,7 +369,7 @@ class ValueConverter
                     if ($firstArrKey !== null && !is_string($firstArrKey)) {
                         throw new LazyJsonMapperException(sprintf(
                             'Unable to convert non-object-array inner value for property "%s" into class "%s".',
-                            $propName, $propDef->propType
+                            $propName, $strictClassPath
                         ));
                     }
 
@@ -336,11 +377,11 @@ class ValueConverter
                     try {
                         // Attempt creation and catch any construction issues.
                         // NOTE: This won't modify $value if construction fails.
-                        $value = new $propDef->propType($value); // Constructs the classname in propType.
+                        $value = new $strictClassPath($value); // Constructs the classname in var.
                     } catch (\Exception $e) { // IMPORTANT: Catch ANY exception!
                         throw new LazyJsonMapperException(sprintf(
                             'Failed to create an instance of class "%s" for property "%s": "%s".',
-                            $propDef->propType, $propName, $e->getMessage()
+                            $strictClassPath, $propName, $e->getMessage()
                         ));
                     }
                 }
@@ -348,13 +389,14 @@ class ValueConverter
                 // Validate that the class matches the defined property class type.
                 // NOTE: Since all PropertyDefinition types are validated to derive
                 // from LazyJsonMapper, we don't need to verify "instanceof".
-                if (!is_a($value, $propDef->propType)) { // Exact same class or a subclass of it.
+                if (!is_a($value, $strictClassPath)) { // Exact same class or a subclass of it.
                     throw new LazyJsonMapperException(sprintf(
                         'Unexpected "%s" object in property "%s", but we expected an instance of "%s".',
-                        get_class($value), $propName, $propDef->propType
+                        PropertyMapCompiler::createStrictClassPath(get_class($value)),
+                        $propName, $strictClassPath
                     ));
                 }
-            }
+            } // End of "Get object from internal".
         } // End of CONVERT_FROM_INTERNAL.
     }
 }

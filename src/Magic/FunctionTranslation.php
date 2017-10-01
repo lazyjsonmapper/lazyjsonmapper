@@ -22,6 +22,34 @@ use LazyJsonMapper\Exception\MagicTranslationException;
 /**
  * Automatically translates a function name into equivalent property names.
  *
+ * The function names will be calculated into both snake_case and camelCase
+ * style properties, so that you can then look for their existence.
+ *
+ * Any problems with the casing of the initial word will be preserved, which
+ * ensures that we will never accidentally treat "GetX()" the same as "getX()".
+ * The initial word can be anything, such as "extract" or "parse" or "get".
+ *
+ * Translation Examples:
+ *
+ * - "getSome0XThing"       =>  type: "get"
+ *                             snake: "some0_x_thing"
+ *                             camel: "some0XThing"
+ * - "hasSome0xThing"       =>  type: "has"
+ *                             snake: "some0x_thing"
+ *                             camel: "some0xThing"
+ * - "GetSomeThing"         =>  type: "Get"
+ *                             snake: "some_thing"
+ *                             camel: "someThing"
+ * - "Get_MessageList"      =>  type: "Get"
+ *                             snake: "_message_list"
+ *                             camel: "_messageList"
+ * - "get__Foo_Bar__XBaz__" =>  type: "get"
+ *                             snake: "__foo__bar___x_baz__"
+ *                             camel: "__foo_Bar__XBaz__"
+ * - "get___"               =>  type: "get"
+ *                             snake: "___"
+ *                             camel: "" (none, since there's nothing to camel)
+ *
  * NOTE: The class validates all parameters, but provides public properties to
  * avoid needless function calls. It's therefore your responsibility to never
  * assign any bad values to the public properties after this object's creation!
@@ -29,6 +57,8 @@ use LazyJsonMapper\Exception\MagicTranslationException;
  * @copyright 2017 The LazyJsonMapper Project
  * @license http://www.apache.org/licenses/LICENSE-2.0
  * @author SteveJobzniak (https://github.com/SteveJobzniak)
+ *
+ * @see PropertyTranslation
  */
 class FunctionTranslation
 {
@@ -77,13 +107,14 @@ class FunctionTranslation
     public function __construct(
         $functionName)
     {
-        if (!is_string($functionName)) {
-            throw new MagicTranslationException('The function name must be a string value.');
+        if (!is_string($functionName) || $functionName === '') {
+            throw new MagicTranslationException('The function name must be a non-empty string value.');
         }
 
         // Extract the components of the function name.
         $chunks = self::_explodeCamelCase($functionName);
-        if ($chunks === false || count($chunks) < 2) {
+        $chunkCount = count($chunks);
+        if ($chunks === false || $chunkCount < 2) {
             throw new MagicTranslationException(sprintf(
                 'Invalid function name "%s".',
                 $functionName
@@ -92,13 +123,13 @@ class FunctionTranslation
 
         // Shift out the first chunk, containing function type (such as "get").
         $functionType = array_shift($chunks);
+        $chunkCount--;
 
         // The property name chunks are already in perfect format for camelCase.
         // The first chunk starts with a lowercase letter, and all other chunks
         // start with an uppercase letter. So generate the camelCase property
         // name version first. But only if there are 2+ chunks. Otherwise NULL.
         // NOTE: Turns "i,Tunes,Item" into "iTunesItem", and "foo" into NULL.
-        $chunkCount = count($chunks);
         $camelPropName = $chunkCount >= 2 ? implode('', $chunks) : null;
 
         // Now make the second property name chunk and onwards into lowercase,
@@ -130,6 +161,7 @@ class FunctionTranslation
      * but before the property name are moved to the 1st property name chunk.
      *
      * Examples:
+     *
      * - "getSome0XThing"  => "get", "some0", "X", "Thing".
      * - "hasSome0xThing"  => "has", "some0x", "Thing".
      * - "GetSomeThing"    => "Get", "some", "Thing".
@@ -147,15 +179,47 @@ class FunctionTranslation
         // NOTE: Since all chunks are split on camelcase boundaries below, it
         // means that each chunk ONLY holds a SINGLE fragment which can ONLY
         // contain at most a SINGLE capital letter (the chunk's first letter).
+        // NOTE: If this doesn't match anything, the input is returned as-is.
         $chunks = preg_split('/(?=[A-Z])/', $inputString, -1, PREG_SPLIT_NO_EMPTY);
         if ($chunks === false) {
-            return false;
+            return false; // Only happens on regex engine failure, NOT mismatch!
+        }
+
+        // Commented out because we ALWAYS pass 1+ character strings in...
+        // if ($chunkCount === 0) { // Means we had totally empty input.
+        //     return false;
+        // }
+
+        // If there is a single chunk, it means that the input was either a
+        // single character long, or that it didn't contain any uppercase
+        // characters to split on, or that it only contained a single uppercase
+        // character. In that situation we'll have to handle a special case:
+        // [prefix][sequence of underscores]. Otherwise, we wouldn't be able to
+        // access properties with names like "___".
+        $chunkCount = count($chunks);
+        if ($chunkCount === 1) {
+            // Looks for 1+ non-underscore characters, followed by 1+
+            // underscores. It does NOT match something like "get__m", because
+            // that is NOT a valid function name that we would ever generate (we
+            // would generate that one as "get__M").
+            //
+            // Valid examples: "get___" = "get", "___"
+            // and: "get_" = "get", "_"
+            // and: "g_" = "g", "_"
+            // and: "Get_" = "Get", "_"
+            if (preg_match('/^([^_]+)(_+)$/', $chunks[0], $matches)) {
+                // Valid name...
+                return [$matches[1], $matches[2]];
+            } else {
+                // Okay this is a truly invalid name such as "get___m" or "get".
+                return false;
+            }
         }
 
         // If there are at least 2 chunks, then we have a function name and its
         // individual property name fragments after that...
-        if (count($chunks) >= 2) {
-            // Lowercase leading uppercase of the 2nd ("property name") chunk,
+        if ($chunkCount >= 2) {
+            // Lowercase the leading uppercase of 2nd ("property name") chunk,
             // since that one needs lowercase in both normal_case and camelCase.
             $chunks[1] = lcfirst($chunks[1]);
 

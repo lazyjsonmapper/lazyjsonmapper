@@ -98,8 +98,14 @@ class PropertyDefinition
     /**
      * Constructor.
      *
-     * @param string|null $definitionStr The string describing the property, or
-     *                                   NULL to create a default "untyped" property
+     * @param string|null $definitionStr A PHPdoc-style string describing the property,
+     *                                   or NULL to create a default "untyped" property.
+     *                                   Note that if the type is set to the exact
+     *                                   keyword "LazyJsonMapper", we will select
+     *                                   the core class path without you needing
+     *                                   to write the full "\LazyJsonMapper\..."
+     *                                   path yourself. This works with "array of"
+     *                                   "LazyJsonMapper[][]" syntax too.
      * @param string|null $baseNamespace Namespace to use for resolving relative
      *                                   class paths. It CANNOT start or end with
      *                                   a backslash. (Use __NAMESPACE__ format).
@@ -178,6 +184,11 @@ class PropertyDefinition
         // to be a reachable LazyJsonMapper-based class.
         $this->isObjectType = true;
 
+        // Check if they've used the special shortcut for the core class.
+        if ($this->propType === 'LazyJsonMapper') {
+            $this->propType = '\\'.LazyJsonMapper::class;
+        }
+
         // Begin by copying whatever remaining type value they've provided...
         $classPath = $this->propType;
 
@@ -231,7 +242,7 @@ class PropertyDefinition
             // they don't get any property definitions, and therefore their
             // object would be unreliable. But that's the user's choice.
             if ($fullClassPath !== LazyJsonMapper::class
-                && !$reflector->isSubClassOf(LazyJsonMapper::class)) {
+                && !$reflector->isSubClassOf('\\'.LazyJsonMapper::class)) {
                 throw new BadPropertyDefinitionException(sprintf(
                     'Class "\\%s" must inherit from LazyJsonMapper.',
                     $fullClassPath

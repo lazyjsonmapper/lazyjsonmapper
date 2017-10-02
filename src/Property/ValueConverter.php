@@ -18,6 +18,7 @@
 namespace LazyJsonMapper\Property;
 
 use LazyJsonMapper\Exception\LazyJsonMapperException;
+use LazyJsonMapper\Utilities;
 
 /**
  * Automatic variable type converter and validator.
@@ -392,7 +393,7 @@ class ValueConverter
                 if (!is_a($value, $strictClassPath)) { // Exact same class or a subclass of it.
                     throw new LazyJsonMapperException(sprintf(
                         'Unexpected "%s" object in property "%s", but we expected an instance of "%s".',
-                        PropertyMapCompiler::createStrictClassPath(get_class($value)),
+                        Utilities::createStrictClassPath(get_class($value)),
                         $propName, $strictClassPath
                     ));
                 }

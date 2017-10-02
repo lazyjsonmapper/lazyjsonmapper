@@ -21,6 +21,7 @@ use LazyJsonMapper\Exception\BadPropertyDefinitionException;
 use LazyJsonMapper\Exception\BadPropertyMapException;
 use LazyJsonMapper\Exception\CircularPropertyMapException;
 use LazyJsonMapper\LazyJsonMapper;
+use LazyJsonMapper\Utilities;
 use ReflectionClass;
 use ReflectionException;
 
@@ -71,6 +72,16 @@ class PropertyMapCompiler
         PropertyMapCache $propertyMapCache,
         $solveClassName)
     {
+        // ----------------------------------
+        // TODO:
+        // Refactor this PropertyMapCompiler. I wrote it as a single function
+        // while building the algorithm from scratch, since it was much easier
+        // that way because it meant that I always had all variables in the
+        // same scope while evolving the code. But it would be great to now
+        // split it into various smaller, protected subroutines such as
+        // "_importClassMap()" etc, since the algorithm itself is 100% finished.
+        // ----------------------------------
+
         // Sanity-check the classname argument to protect against accidents.
         if (!is_string($solveClassName) || $solveClassName === '') {
             throw new BadPropertyMapException('Argument 1 must be a non-empty string.');
@@ -87,7 +98,7 @@ class PropertyMapCompiler
         // PHP's internal get_class()-style representation. But we use strict
         // "\Foo\Bar" when we actually interact with a class or throw errors.
         // That way, both PHP and the user understands that it's a global path.
-        $strictSolveClassName = self::createStrictClassPath($solveClassName);
+        $strictSolveClassName = Utilities::createStrictClassPath($solveClassName);
 
         // Let's compile the desired "solve-class", since it wasn't cached.
         // NOTE: This entire algorithm is EXCESSIVELY commented so that everyone
@@ -110,7 +121,7 @@ class PropertyMapCompiler
             if ($solveClassName !== $reflector->getName()) {
                 throw new BadPropertyMapException(sprintf(
                     'Unable to compile class "%s" due to mismatched class name parameter value (the real class name is: "%s").',
-                    $strictSolveClassName, self::createStrictClassPath($reflector->getName())
+                    $strictSolveClassName, Utilities::createStrictClassPath($reflector->getName())
                 ));
             }
 
@@ -120,7 +131,7 @@ class PropertyMapCompiler
                 $classHierarchy[$reflector->getName()] = [
                     'reflector'       => $reflector,
                     'namespace'       => $reflector->getNamespaceName(),
-                    'strictClassName' => self::createStrictClassPath($reflector->getName()),
+                    'strictClassName' => Utilities::createStrictClassPath($reflector->getName()),
                 ];
 
                 // Update the reflector variable to point at the next
@@ -393,7 +404,7 @@ class PropertyMapCompiler
                                     // Potential import... we must first ensure
                                     // that the class has a global "\" prefix.
                                     $importClassName = $propDefStr;
-                                    $strictImportClassName = self::createStrictClassPath($importClassName);
+                                    $strictImportClassName = Utilities::createStrictClassPath($importClassName);
 
                                     // Now check if the target class fits the
                                     // "import class" requirements.
@@ -441,7 +452,7 @@ class PropertyMapCompiler
                                     // correct target class.
                                     $reflector = new ReflectionClass($strictImportClassName);
                                     $importClassName = $reflector->getName();
-                                    $strictImportClassName = self::createStrictClassPath($importClassName);
+                                    $strictImportClassName = Utilities::createStrictClassPath($importClassName);
                                 } catch (ReflectionException $e) {
                                     // This should never be able to fail,
                                     // but if it does, treat it as a bad map.
@@ -651,31 +662,5 @@ class PropertyMapCompiler
                 unset($propertyMapCache->compilerLocks[$lockedClassName]);
             }
         } // End of try-finally.
-    }
-
-    /**
-     * Create a strict, global class path.
-     *
-     * This helper ensures that the input is a non-empty string, and then
-     * automatically prepends a leading "\" if missing, so that PHP understands
-     * that the class search MUST happen only in the global namespace.
-     *
-     * @param string $className The class name to convert.
-     *
-     * @return string|null String if non-empty string input, otherwise NULL.
-     */
-    public static function createStrictClassPath(
-        $className = '')
-    {
-        if (is_string($className) && strlen($className) > 0) {
-            // Prepend "\" if missing, to force PHP to use the global namespace.
-            if ($className[0] !== '\\') {
-                $className = '\\'.$className;
-            }
-
-            return $className;
-        }
-
-        return null;
     }
 }

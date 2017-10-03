@@ -381,7 +381,9 @@ class ValueConverter
                         $value = new $strictClassPath($value); // Constructs the classname in var.
                     } catch (\Exception $e) { // IMPORTANT: Catch ANY exception!
                         throw new LazyJsonMapperException(sprintf(
-                            'Failed to create an instance of class "%s" for property "%s": "%s".',
+                            'Failed to create an instance of class "%s" for property "%s": %s',
+                            // NOTE: No need to format the exception message
+                            // since it already has perfect grammar.
                             $strictClassPath, $propName, $e->getMessage()
                         ));
                     }

@@ -112,7 +112,7 @@ class FunctionTranslation
         }
 
         // Extract the components of the function name.
-        $chunks = self::_explodeCamelCase($functionName);
+        $chunks = $this->_explodeCamelCase($functionName);
         $chunkCount = count($chunks);
         if ($chunks === false || $chunkCount < 2) {
             throw new MagicTranslationException(sprintf(
@@ -171,7 +171,7 @@ class FunctionTranslation
      *
      * @return string[]|bool Array with parts if successful, otherwise FALSE.
      */
-    protected static function _explodeCamelCase(
+    protected function _explodeCamelCase(
         $inputString)
     {
         // Split the input into chunks on all camelcase boundaries.

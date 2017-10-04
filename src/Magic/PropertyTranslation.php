@@ -93,7 +93,7 @@ class PropertyTranslation
             throw new MagicTranslationException('The property name must be a non-empty string value.');
         }
 
-        $this->propFuncCase = self::_propToFunctionCase($propertyName);
+        $this->propFuncCase = $this->_propToFunctionCase($propertyName);
     }
 
     /**
@@ -107,7 +107,7 @@ class PropertyTranslation
      *
      * @return string
      */
-    protected static function _propToFunctionCase(
+    protected function _propToFunctionCase(
         $propName)
     {
         // To translate a property name to FunctionCase, we must simply convert

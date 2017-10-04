@@ -20,6 +20,7 @@ namespace LazyJsonMapper\Property;
 use LazyJsonMapper\Exception\BadPropertyDefinitionException;
 use LazyJsonMapper\Exception\BadPropertyMapException;
 use LazyJsonMapper\Exception\CircularPropertyMapException;
+use LazyJsonMapper\Exception\LazyJsonMapperException;
 use LazyJsonMapper\LazyJsonMapper;
 use LazyJsonMapper\Utilities;
 use ReflectionClass;
@@ -49,6 +50,26 @@ class PropertyMapCompiler
      * PropertyDefinition objects, to reduce the memory requirements even more.
      * The same is true for any imported maps via the import mechanism.
      *
+     * As an additional layer of protection, ALL properties (in the current
+     * class or its extends/import-hierarchy) that point to uncompiled classes
+     * will ALSO be verified and compiled, to ensure that THEIR class property
+     * maps compile successfully. It ensures that we'll be able to trust that
+     * every property in our class and its entire tree of related classes are
+     * pointing at classes that have been successfully compiled and are known
+     * to work and are ready for reliable use at runtime.
+     *
+     * That extra protection does however also mean that your runtime's initial
+     * compile-calls will take the longest, since they'll spider-crawl the
+     * ENTIRE hierarchy of extends, imports, and ALL properties of each, and
+     * then ALL extends and imports of the classes pointed to by those
+     * properties, and so on... But despite all of that extra work, it's STILL
+     * blazingly FAST at compiling, and the extra security is well worth it! And
+     * as soon as all relevant maps are compiled during your current runtime,
+     * this function won't have to do any work anymore! Then you can just relax
+     * and fully trust that all of your class maps are perfect! :-)
+     *
+     * This compiler algorithm provides perfect peace of mind.
+     *
      * @param PropertyMapCache $propertyMapCache The cache to use for storage
      *                                           and lookups. Will be written to.
      * @param string           $solveClassName   The full path of the class to
@@ -67,6 +88,11 @@ class PropertyMapCompiler
      *                                        or the imports of any part of the
      *                                        class you're trying to compile.
      *                                        This is a serious exception!
+     *
+     * @return array Empty array if this is the top-level compile-call (that is
+     *               what an external caller would see). Otherwise an array of
+     *               encountered property classes whenever this is a recursive,
+     *               internal subcall within the PropertyMapCompiler class.
      */
     public static function compileClassPropertyMap(
         PropertyMapCache $propertyMapCache,
@@ -192,6 +218,75 @@ class PropertyMapCompiler
         foreach ($ourCompilerClassLocks as $className => $x) {
             $propertyMapCache->compilerLocks[$className] = true;
         }
+
+        // During the main compilation phase, we'll ONLY compile the actual
+        // class that we've been told to compile, as well as its parent
+        // hierarchy and any imports that any of them contain. But any of the
+        // compiled maps MAY in turn contain PROPERTIES that point at OTHER
+        // classes. The PropertyDefinition construction will always verify that
+        // the properties are pointing at reachable (having a valid class-path)
+        // LazyJsonMapper classes. However, the actual CLASS MAPS of THOSE
+        // classes may contain problems too and may be impossible to compile. We
+        // obviously want to figure that out for the user RIGHT NOW so that they
+        // don't run into issues later when trying to access such a property
+        // someday (which would then trigger its map compilation and throw a
+        // compiler failure deep into their runtime environment when they least
+        // expected it). The truth is that normal people will sometimes write
+        // bad classes, and then point properties at those bad classes. And
+        // without us proactively pre-compiling all classes pointed to by their
+        // properties, they would NEVER know about the problem until someday
+        // later when their program suddenly accesses that bad property
+        //
+        // So we SHOULD analyze everything for the user's safety. But... we
+        // unfortunately CANNOT compile them during the main compilation stage.
+        // In fact, we cannot even compile them afterwards EITHER, UNLESS we are
+        // the ABSOLUTE ROOT FUNCTION CALL which STARTED the whole compilation
+        // process (in other words, whatever class whose constructor ran and
+        // began its own compilation and started resolving the various maps).
+        // Only the root function call is allowed to resolve PROPERTY references
+        // to other classes and ensure that THOSE maps are successfully are
+        // compiled too. Otherwise we'd run into circular compilation issues
+        // where properties fail to compile because they may be pointing at
+        // things which are not compiled yet (such as a class containing a
+        // property that points at itself, or "A" having a property that points
+        // to class "B" which has a property that points to class "C" which has
+        // a property that points back at class "A" and therefore would cause a
+        // circular reference if we'd tried to compile those property-classes
+        // instantly as-they're encountered). We must therefore defer
+        // property-class compilation until ALL core classes in the current
+        // inheritance/import chain are resolved. THEN it's safe to begin
+        // compiling any other encountered classes from the properties...
+        //
+        // The solution is "simple": Build a list of the class-paths of all
+        // encountered property classes within our own map tree and within any
+        // imports (which are done via recursive compile-calls). To handle
+        // imports, we simply ensure that our compile-function (this one)
+        // returns the list of encountered classes in properties so that we'll
+        // let it bubble up all the way to the root class/call that began the
+        // whole compile-chain. And then just let that top-level call resolve
+        // all properties from the entire tree by just compiling the list of
+        // property-classes one by one if they're still missing. That way,
+        // we'll get full protection against uncompilable class-properties
+        // anywhere in our tree, and we'll do it at a totally safe time (at
+        // the end of the main compilation call that kicked everything off)!
+        //
+        // NOTE: As an optimization, to avoid constant array-writes and the
+        // creation of huge and rapidly growing "encountered classes" arrays,
+        // this will actually attempt to ONLY track the encountered classes that
+        // are MISSING from the cache. And this list will ALSO be checked one
+        // more time before it's returned, to truly clear everything that's
+        // already done. That's intended to make the list as light-weight
+        // as possible so that the parent-call doesn't have to do heavy lifting.
+        //
+        // NOTE: The fact is that most classes that properties point to will
+        // already be pre-compiled, or at least large parts of their
+        // inheritance/import hierarchy will already be compiled, so this
+        // recursive "property-class" compilation isn't very heavy at all. It's
+        // as optimized as it can be. Classes we encounter will ONLY compile the
+        // specific aspects of their class maps which haven't been compiled yet.
+        // We basically spend a tiny bit of extra effort here during compilation
+        // to save users from a ton of pain from THEIR bad classes later. ;-)
+        $encounteredPropertyClasses = [];
 
         // Traverse the class hierarchy and compile and merge their property
         // maps, giving precedence to later classes in case of name clashes.
@@ -385,7 +480,32 @@ class PropertyMapCompiler
                                     // of the compiled maps. So re-use = ok.
                                     if (!isset($currentClassPropertyMap[$propName])
                                         || !$propDefObj->equals($currentClassPropertyMap[$propName])) {
+                                        // Add the unique property to our map.
                                         $currentClassPropertyMap[$propName] = $propDefObj;
+
+                                        // Alright, we've encountered a brand
+                                        // new property, and we know it's a
+                                        // LazyJsonMapper if it's an object. But
+                                        // we DON'T know if the TARGET class can
+                                        // actually COMPILE. We need to add the
+                                        // class to the list of encountered
+                                        // property classes. But only if we
+                                        // haven't already compiled it.
+                                        if ($propDefObj->isObjectType
+                                            && !isset($propertyMapCache->classMaps[$propDefObj->propType])) {
+                                            // NOTE: During early compilations,
+                                            // at the startup of a PHP runtime,
+                                            // this will pretty much always add
+                                            // classes it sees since NOTHING is
+                                            // compiled while the first class is
+                                            // being compiled. Which means that
+                                            // this list will contain classes
+                                            // that are already solved. But
+                                            // we'll take care of that by
+                                            // double-checking this list later
+                                            // before we return it!
+                                            $encounteredPropertyClasses[$propDefObj->propType] = true;
+                                        }
                                     }
                                 } catch (BadPropertyDefinitionException $e) {
                                     // Add details and throw from here instead.
@@ -590,20 +710,39 @@ class PropertyMapCompiler
                                 // _cannot_ be resolved. So we'll let the error
                                 // bubble up all the way to the original call.
                                 if (!isset($propertyMapCache->classMaps[$importClassName])) {
+                                    // Compile the target class to import.
                                     // NOTE: Throws in case of serious errors!
-                                    self::compileClassPropertyMap($propertyMapCache, $importClassName);
-                                }
+                                    // NOTE: We will not catch the error. So if
+                                    // the import fails to compile, it'll simply
+                                    // output its own message saying that
+                                    // something was wrong in that class. We
+                                    // don't bother including any info about
+                                    // our class (the one which imported it).
+                                    // That's still very clear in this case,
+                                    // since the current class and its hierarchy
+                                    // will be in the stack trace as well as
+                                    // always having a clearly visible import-
+                                    // command in their class property map code.
+                                    $importEncounteredPropertyClasses = self::compileClassPropertyMap(
+                                        $propertyMapCache,
+                                        $importClassName
+                                    );
 
-                                // If we've reached this point, it means that
-                                // our target class should be in the cache since
-                                // its compilation ran successfully (or it was
-                                // already cached). Just verify it to be safe.
-                                // NOTE: This step should never go wrong.
-                                if (!isset($propertyMapCache->classMaps[$importClassName])) {
-                                    throw new BadPropertyMapException(sprintf(
-                                        'Unable to resolve property map for class "%s", when trying to import it into class "%s".',
-                                        $strictImportClassName, $classInfo['strictClassName']
-                                    ));
+                                    // Add the imported class hierarchy's own
+                                    // encountered property-classes to our list
+                                    // of encountered classes. It gives us
+                                    // everything from their extends-hierarchy
+                                    // and everything from their own imports.
+                                    // And in case they had multi-level chained
+                                    // imports (classes that import classes
+                                    // that import classes), it'll be returning
+                                    // a fully recursively resolved sub-import
+                                    // list. We get them ALL! Perfect.
+                                    // NOTE: The merge function de-duplicates!
+                                    $encounteredPropertyClasses = array_merge(
+                                        $encounteredPropertyClasses,
+                                        $importEncounteredPropertyClasses
+                                    );
                                 }
 
                                 // Now simply loop through the compiled property
@@ -662,5 +801,143 @@ class PropertyMapCompiler
                 unset($propertyMapCache->compilerLocks[$lockedClassName]);
             }
         } // End of try-finally.
+
+        // If we've reached this point, it means that our solve-class should be
+        // in the cache since its compilation ran successfully above. Just
+        // verify it to be extra safe against any random future mistakes.
+        // NOTE: This step should never go wrong.
+        if (!isset($propertyMapCache->classMaps[$solveClassName])) {
+            throw new BadPropertyMapException(sprintf(
+                'Error while compiling class "%s". Could not find the class in the cache afterwards.',
+                $strictSolveClassName
+            ));
+        }
+
+        // If we came this far, it means that nothing above threw, which means
+        // that our class and its hierarchy of inheritance (and map-imports) as
+        // well as all PropertyDefinitions have succeeded for the whole tree...
+        // Now the only remaining question is whether it's safe for us to check
+        // the list of encountered classes in properties and ensure that those
+        // can all be compiled too... And the answer is NO, unless we are the
+        // absolute ROOT CALL which began the whole compilation process. If not,
+        // then we should merely return our list of encountered classes and let
+        // our parent-caller deal with our list.
+
+        // First generate a debug backtrace with just the last 2 stack frames,
+        // and ignore their arguments (to save RAM and CPU time).
+        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+
+        // To determine if we are a recursive subcall, simply check if the
+        // previous stack frame is this exact function.
+        // TODO: If we refactor this compilation function and split it into
+        // multiple functions, then this check WILL break, so keep that in mind
+        // and rewrite it too in that case! Maybe as easily as just checking if
+        // the call came from within this class (removing the 'function' check).
+        $isSubCall = count($backtrace) >= 2
+                   && $backtrace[0]['function'] === $backtrace[1]['function']
+                   && $backtrace[0]['class'] === $backtrace[1]['class'];
+
+        // If we are a subcall, simply return our list of encountered property
+        // classes to let our parent call-chain bubble it to the root call...
+        if ($isSubCall) {
+            // Some already-processed classes may have slipped onto the list
+            // before they became compiled. So before returning the list we'll
+            // just ensure that we remove all keys that refer to classes that
+            // have already been compiled. That saves RAM and processing power
+            // during the array merging in the parent. Basically, we want this
+            // list to always be as short as possible so there's less need for
+            // any HUGE array manipulation at a later stage.
+            foreach ($encounteredPropertyClasses as $encClassName => $x) {
+                if (isset($propertyMapCache->classMaps[$encClassName])) {
+                    unset($encounteredPropertyClasses[$encClassName]);
+                }
+            }
+
+            return $encounteredPropertyClasses; // Skip the rest of the code.
+        }
+
+        // We're the root call! So it is now safe (and IMPORTANT!) to compile
+        // all of the not-yet-compiled classes from the inheritance tree, to
+        // ensure that EVERY part of the tree is ready as far as classmaps go.
+        // NOTE: We have no information about how deeply the encountered classes
+        // existed. But it doesn't matter, since they may exist in multiple
+        // places. If there's a problem we'll simply say that "the class (this
+        // initial root/non-subcall one) or one of its parents or imports has a
+        // property which is linked to bad class X". Especially since there may
+        // also be problems within properties of THESE classes that we're going
+        // to compile. So trying to pinpoint exactly which class had the bad
+        // reference to an uncompilable class is overkill. We'll just show the
+        // uncompilable class name plus its regular high-quality compilation
+        // error message which describes what property failed to compile and
+        // why it failed. The user should simply fix THAT particular class.
+        $workQueue = &$encounteredPropertyClasses; // By ref to avoid COW.
+        while (!empty($workQueue)) {
+            // Build a list of all properties from the classes that we'll be
+            // compiling during this run through the work queue.
+            $allSubEncounteredPropertyClasses = [];
+
+            // Process all entries in the current queue.
+            foreach ($workQueue as $encClassName => $x) {
+                // Unset this work queue entry since we're processing it.
+                unset($workQueue[$encClassName]);
+
+                // Skip this class if it's already been successfully compiled.
+                if (isset($propertyMapCache->classMaps[$encClassName])) {
+                    continue;
+                }
+
+                try {
+                    // Attempt to compile the missing class. Throws if there's
+                    // any problem with its compilation process.
+                    // NOTE: This will return a list of ALL of the recursively
+                    // discovered classes that its tree of properties refer to.
+                    // NOTE: Throws in case of serious errors!
+                    $thisSubEncounteredPropertyClasses = self::compileClassPropertyMap(
+                        $propertyMapCache,
+                        $encClassName
+                    );
+
+                    // After successful compilation... add ITS encountered
+                    // properties to the "all"-list for this work runthrough.
+                    // NOTE: The merge function de-duplicates!
+                    $allSubEncounteredPropertyClasses = array_merge(
+                        $allSubEncounteredPropertyClasses,
+                        $thisSubEncounteredPropertyClasses
+                    );
+                } catch (LazyJsonMapperException $e) {
+                    // Failed to compile the class we discovered in a property.
+                    // It can be due to all kinds of problems, such as circular
+                    // property maps or bad imports or bad definitions or
+                    // anything else. We'll wrap the message in a slightly
+                    // prefixed message just to hint that this problem is with a
+                    // property. But the compilation error message itself is
+                    // clear about which class failed to compile and why.
+                    // NOTE: This is unlike imports, where we simply let their
+                    // original exception bubble up, since imports are a more
+                    // "integral" part of a class (a class literally cannot be
+                    // built without its parents and imports compiling). But
+                    // properties are different and are more numerous and are
+                    // capable of being resolved by _getProperty() without
+                    // having been pre-compiled when the main class map itself
+                    // was compiled (although we just DID that pre-compilation
+                    // above; we NEVER let them wait to get resolved later).
+                    throw new BadPropertyMapException(sprintf(
+                        'Compilation of sub-property hierarchy failed for class "%s". Reason: %s',
+                        $strictSolveClassName, $e->getMessage()
+                    ));
+                }
+            }
+
+            // If this queue run-through encountered any more uncompiled
+            // property-classes within the classes it compiled, then we
+            // should add those to the queue and let it run through again...
+            if (!empty($allSubEncounteredPropertyClasses)) {
+                // NOTE: The merge function de-duplicates!
+                $workQueue = array_merge($workQueue, $allSubEncounteredPropertyClasses);
+            }
+        } // End of work-queue loop.
+
+        // Return an empty array since we're the root compile-call.
+        return [];
     }
 }

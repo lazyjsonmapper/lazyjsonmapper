@@ -20,7 +20,6 @@ namespace LazyJsonMapper\Property;
 use LazyJsonMapper\Exception\BadPropertyDefinitionException;
 use LazyJsonMapper\Exception\BadPropertyMapException;
 use LazyJsonMapper\Exception\CircularPropertyMapException;
-use LazyJsonMapper\Exception\LazyJsonMapperException;
 use LazyJsonMapper\LazyJsonMapper;
 use LazyJsonMapper\Utilities;
 use ReflectionClass;
@@ -47,7 +46,10 @@ class PropertyMapCompiler
     /** @var string Strict global path (leading backslash) to solve-class. */
     private $_strictSolveClassName;
 
-    /** @var array Uncompiled classes encountered in properties during compile. */
+    /** @var array All classes that were compiled by us or our sub-compilers. */
+    public $compiledClasses; // Public to allow parent-access.
+
+    /** @var array Uncompiled classes seen in properties by us or our sub-compilers. */
     public $uncompiledPropertyClasses; // Public to allow parent-access.
 
     /** @var array The reflected class hierarchy for the solve-class. */
@@ -72,8 +74,9 @@ class PropertyMapCompiler
      * for the given class, and validates all definitions in the entire map.
      *
      * Each class definition is only resolved and parsed a single time; the
-     * first time we encounter it. From then on, it is stored in the cache
-     * so that object creations can instantly link to their compiled map.
+     * first time we encounter it. From then on, it is stored in the cache so
+     * that object creations can instantly link to their compiled map. And so
+     * any other classes which rely on that class can instantly re-use its map.
      *
      * And all maps are built hierarchically, starting with their base class.
      * Every sub-object which extends that object re-uses its parent's compiled
@@ -83,10 +86,13 @@ class PropertyMapCompiler
      * As an additional layer of protection, ALL properties (in the current
      * class and its extends/import-hierarchy) that point to uncompiled classes
      * will ALSO be verified and compiled, to ensure that THEIR class property
-     * maps compile successfully. It ensures that users will be able to trust
-     * that every property in their class and its entire tree of related classes
-     * are pointing at classes that have been successfully compiled and are
-     * known to work and are ready for reliable use at runtime.
+     * maps compile successfully. And it will happen recursively until all
+     * linked classes (inheritance, imports and property links) have been fully
+     * compiled throughout the entire linked hierarchy. It ensures that users
+     * will be able to FULLY trust that EVERY property in their class and its
+     * ENTIRE tree of related classes are pointing at classes that have been
+     * successfully compiled and are known to work and are ready for reliable
+     * use at runtime.
      *
      * That extra protection does however also mean that your runtime's initial
      * compile-calls will take the longest, since they'll spider-crawl the
@@ -98,9 +104,12 @@ class PropertyMapCompiler
      * runtime, this function won't have to do any work anymore! Then you can
      * just relax and fully trust that all of your class maps are perfect! :-)
      *
+     * If there are ANY compilation problems, then an automatic rollback takes
+     * place which restores the PropertyMapCache to its original pre-call state.
+     *
      * This compiler algorithm provides perfect peace of mind. If it doesn't
      * throw any errors, it means that your entire class hierarchy has been
-     * compiled and is ready for use in the cache!
+     * compiled and is ready for use in your cache!
      *
      * @param PropertyMapCache $propertyMapCache The cache to use for storage
      *                                           and lookups. Will be written to.
@@ -125,12 +134,12 @@ class PropertyMapCompiler
         PropertyMapCache $propertyMapCache,
         $solveClassName)
     {
-        $compiler = new self( // Throws.
+        $rootCompiler = new self( // Throws.
             true, // This is the ROOT compilation call!
             $propertyMapCache,
             $solveClassName
         );
-        $compiler->compile(); // Throws.
+        $rootCompiler->compile(); // Throws.
     }
 
     /**
@@ -173,6 +182,21 @@ class PropertyMapCompiler
         // "\Foo\Bar" when we actually interact with a class or throw errors.
         // That way, both PHP and the user understands that it's a global path.
         $this->_strictSolveClassName = Utilities::createStrictClassPath($this->_solveClassName);
+
+        // We will keep track of ALL classes compiled by ourselves and our
+        // recursive sub-compilers. In case of errors ANYWHERE in the process,
+        // we MUST ensure that all of those classes are erased from the cache
+        // again, since they may have serious errors. This list of compiled
+        // classes was specifically added to handle the fact that the class map
+        // and its hierarchy/imports themselves often fully compile themselves
+        // successfully, but then THEIR property class compilations (the root-
+        // POST-PROCESSING step which compiles all classes pointed to by the
+        // maps) MAY fail. In that case, or if there are ANY other compilation
+        // problems in any of the class hierarchies, then we will be sure to
+        // erase ALL of our compiled classes from the cache; otherwise it WOULD
+        // look like those classes are fully compiled and reliable, despite the
+        // bad and invalid classes some of their properties point to!
+        $this->compiledClasses = [];
 
         // During the main compilation phase, we'll ONLY compile the actual
         // class that we've been told to compile, as well as its parent
@@ -256,11 +280,75 @@ class PropertyMapCompiler
     /**
      * Compile the solve-class, and its parent/import hierarchy (as-necessary).
      *
+     * Intelligently watches for compilation errors, and if so it performs an
+     * auto-rollback of ALL classes compiled by this compile()-call AND by all
+     * of its recursive sub-compilations (if any took place).
+     *
+     * It performs the rollback if there were ANY issues with the solve-class or
+     * ANY part of its inheritance hierarchy (extends/imports) OR with the final
+     * post-processing compilation of all of the classes that THEIR properties
+     * were pointing at. And note that the post-processing is ALSO recursive and
+     * will FULLY validate the entire hierarchies and property trees of ALL
+     * classes that IT compiles, and so on... until no more work remains.
+     *
+     * So if this function DOESN'T throw, then you can TRUST that the ENTIRE
+     * hierarchy of property maps related to the requested solve-class has been
+     * compiled. However, note that their final PROPERTY CLASS compilation step
+     * and final success-validation doesn't happen until the top-level
+     * rootCompiler is reached again, since it's the job of the root to handle
+     * the recursive compilation and resolving of all classes encountered in
+     * properties. So it's only the rootCompiler's compile()-call that TRULY
+     * matters and will determine whether EVERYTHING was successful or not.
+     *
+     * Basically: If we fail ANY aspect of the request to compile, then we'll
+     * FULLY roll back everything that we've changed during our processing.
+     * Which safely guarantees that the FINAL map compilation cache ONLY
+     * contains fully verified and trustable classes and their COMPLETE class
+     * inheritance and property hierarchies!
+     *
      * @throws BadPropertyDefinitionException
      * @throws BadPropertyMapException
      * @throws CircularPropertyMapException
+     *
+     * @see PropertyMapCompiler::compileClassPropertyMap() For the truly public,
+     *                                                     static entry point.
+     * @see PropertyMapCompiler::_compile()                For internal core.
      */
     public function compile()
+    {
+        try {
+            $this->_compile();
+        } catch (\Exception $e) { // NOTE: Could target exact type, but meh.
+            // Our compilation or one of its sub-compilations has failed... We
+            // MUST now perform a rollback and unset everything in our list of
+            // compiled classes (which also includes everything that our
+            // sub-compilers have compiled).
+            // NOTE: Every compile()-call is responsible for unsetting ITS OWN
+            // list of (sub-)compiled classes. Because the parent-handler that
+            // reads our "compiledClasses" property may not run when an
+            // exception happens. So it's OUR job to clear OUR changes to the
+            // cache before we let the exception bubble up the call-stack.
+            foreach ($this->compiledClasses as $className => $x) {
+                unset($this->_propertyMapCache->classMaps[$className]);
+                unset($this->compiledClasses[$className]);
+            }
+
+            throw $e; // Re-throw. (Keeps its stack trace & line number.)
+        }
+    }
+
+    /**
+     * The real, internal compiler algorithm entry point.
+     *
+     * MUST be wrapped in another function which handles compilation failures!
+     *
+     * @throws BadPropertyDefinitionException
+     * @throws BadPropertyMapException
+     * @throws CircularPropertyMapException
+     *
+     * @see PropertyMapCompiler::compile() For the wrapper entry point.
+     */
+    private function _compile()
     {
         // There's nothing to do if the class is already in the cache.
         if (isset($this->_propertyMapCache->classMaps[$this->_solveClassName])) {
@@ -306,7 +394,7 @@ class PropertyMapCompiler
             // IMPORTANT: If we've compiled all classes, or if uncaught
             // exceptions were thrown during processing, then we must simply
             // ensure that we unlock all of OUR remaining locks before we allow
-            // the exception to keep bubbling upwards or processing to continue.
+            // the exception to keep bubbling upwards OR processing to continue.
             // NOTE: We AREN'T allowed to unlock classes we didn't lock.
             foreach ($this->_ourCompilerClassLocks as $lockedClassName => $x) {
                 unset($this->_ourCompilerClassLocks[$lockedClassName]);
@@ -347,9 +435,9 @@ class PropertyMapCompiler
             // array merging in the parent. Basically, we want this list to
             // always be as short as possible so there's less need for any HUGE
             // array manipulation at a higher stage while it's bubbling up.
-            foreach ($this->uncompiledPropertyClasses as $encClassName => $x) {
-                if (isset($this->_propertyMapCache->classMaps[$encClassName])) {
-                    unset($this->uncompiledPropertyClasses[$encClassName]);
+            foreach ($this->uncompiledPropertyClasses as $uncompiledClassName => $x) {
+                if (isset($this->_propertyMapCache->classMaps[$uncompiledClassName])) {
+                    unset($this->uncompiledPropertyClasses[$uncompiledClassName]);
                 }
             }
 
@@ -369,42 +457,50 @@ class PropertyMapCompiler
         // reference to an uncompilable class is overkill. We'll just show the
         // uncompilable class name plus its regular high-quality compilation
         // error message which describes why that class failed to compile.
-        // The user should simply fix THAT particular class.
-        $workQueue = &$this->uncompiledPropertyClasses; // By ref to avoid COW.
-        while (!empty($workQueue)) {
-            // Build a list of all uncompiled properties seen in the classes
-            // that we'll be compiling during this work queue run-through.
-            $allSubUncompiledPropertyClasses = [];
+        // The user should simply fix their code in THAT particular class.
+        while (!empty($this->uncompiledPropertyClasses)) {
+            // IMPORTANT: Create a COPY-ON-WRITE version of the current contents
+            // of the "uncompiledPropertyClasses" array. Because that array will
+            // be changing whenever we sub-compile, so we'll use a stable COPY.
+            $workQueue = $this->uncompiledPropertyClasses;
 
             // Process all entries (classes to compile) in the current queue.
-            foreach ($workQueue as $encClassName => $x) {
-                // Unset this work queue entry since we're processing it.
-                unset($workQueue[$encClassName]);
-
+            foreach ($workQueue as $uncompiledClassName => $x) {
                 // Skip this class if it's already been successfully compiled.
-                if (isset($this->_propertyMapCache->classMaps[$encClassName])) {
+                if (isset($this->_propertyMapCache->classMaps[$uncompiledClassName])) {
+                    unset($this->uncompiledPropertyClasses[$uncompiledClassName]);
                     continue;
                 }
 
-                // Attempt to compile the missing class.
+                // Attempt to compile the missing class. We do this one by one
+                // in isolation, so that each extra class we compile gets its
+                // entirely own competition-free sub-compiler with its own
+                // class-locks (since our own top-level rootCompiler's hierarchy
+                // is already fully compiled by this point). Which means that
+                // the sub-classes are welcome to refer to anything we've
+                // already compiled, exactly as if each of these extra classes
+                // were new top-level compiles "running in isolation". The only
+                // difference is that they aren't marked as the root compiler,
+                // since we still want to be the one to resolve all of THEIR
+                // uncompiled property-classes here during THIS loop. Mainly so
+                // that we can be the one to throw exception messages, referring
+                // to the correct root-level class as the one that failed.
                 try {
-                    $subCompiler = new self( // Throws.
-                        false, // Is NOT the root call!
-                        $this->_propertyMapCache, // Use the same cache to share locks.
-                        $encClassName
-                    );
-                    $subCompiler->compile(); // Throws.
-
-                    // After successful compilation... add ITS encountered
-                    // properties to the "all"-list for this work run-through.
-                    // NOTE: This will contain a list of ALL of the recursively
-                    // discovered classes that ITS tree of properties refer to.
-                    // NOTE: The merge function de-duplicates keys!
-                    $allSubUncompiledPropertyClasses = array_merge(
-                        $allSubUncompiledPropertyClasses,
-                        $subCompiler->uncompiledPropertyClasses
-                    );
-                } catch (LazyJsonMapperException $e) {
+                    // NOTE: If this subcompile is successful and encounters any
+                    // more uncompiled property-classes within the classes it
+                    // compiles, they'll be automatically added to OUR OWN list
+                    // of "uncompiledPropertyClasses" and WILL be resolved too.
+                    //
+                    // This will carry on until ALL of the linked classes are
+                    // compiled and no more work remains. In other words, we
+                    // will resolve the COMPLETE hierarchies of every linked
+                    // class and ALL of their properties too. However, this
+                    // subcompilation is still very fast since most end-stage
+                    // jobs refer to classes that are already mostly-compiled
+                    // due to having most of their own dependencies already
+                    // pre-compiled at that point.
+                    $this->_subcompile($uncompiledClassName); // Throws.
+                } catch (\Exception $e) { // NOTE: Could target exact type, but meh.
                     // Failed to compile the class we discovered in a property.
                     // It can be due to all kinds of problems, such as circular
                     // property maps or bad imports or bad definitions or
@@ -420,7 +516,7 @@ class PropertyMapCompiler
                     // class literally CANNOT be built without its parents and
                     // its imports compiling). But CLASSES IN PROPERTIES are
                     // different and are more numerous and are capable of being
-                    // resolved by _getProperty() later without having been
+                    // resolved by _getProperty() LATER without having been
                     // pre-compiled when the main class map itself was compiled
                     // (although we just DID that pre-compilation above; we'll
                     // NEVER let them wait to get resolved later).
@@ -432,17 +528,14 @@ class PropertyMapCompiler
                         'Compilation of sub-property hierarchy failed for class "%s". Reason: %s',
                         $this->_strictSolveClassName, $e->getMessage()
                     ));
-                }
-            }
+                } // End of _subcompile() try-catch.
 
-            // If this queue run-through encountered any more uncompiled
-            // property-classes within the classes it compiled, then we
-            // should add those to the queue and let it run through again...
-            if (!empty($allSubUncompiledPropertyClasses)) {
-                // NOTE: The merge function de-duplicates keys!
-                $workQueue = array_merge($workQueue, $allSubUncompiledPropertyClasses);
-            }
-        } // End of work-queue loop.
+                // The sub-compile was successful (nothing was thrown), which
+                // means that it's now in the compiled property map cache. Let's
+                // unset its entry from our list of uncompiled classes.
+                unset($this->uncompiledPropertyClasses[$uncompiledClassName]);
+            } // End of work-queue loop.
+        } // End of "handle uncompiled property classes" loop.
     }
 
     /**
@@ -674,6 +767,12 @@ class PropertyMapCompiler
                     );
                 }
             }
+
+            // Mark the fact that we have compiled this class, so that we'll be
+            // able to know which classes we have compiled later. This list will
+            // bubble through the compile-call-hierarchy as-needed to keep track
+            // of EVERY compiled class during the current root compile()-run.
+            $this->compiledClasses[$this->_currentClassInfo['className']] = true;
 
             // Now cache the final property-map for this particular class in the
             // inheritance chain... Note that if it had no new/different map
@@ -1000,30 +1099,12 @@ class PropertyMapCompiler
             // Compile the target class to import.
             // NOTE: We will not catch the error. So if the import fails to
             // compile, it'll simply output its own message saying that
-            // something was wrong in that class. We don't bother including any
+            // something was wrong in THAT class. We don't bother including any
             // info about our class (the one which imported it). That's still
             // very clear in this case, since the top-level class compiler and
             // its hierarchy will be in the stack trace as well as always having
             // a clearly visible import-command in their class property map.
-            $subCompiler = new self( // Throws.
-                false, // Is NOT the root call!
-                $this->_propertyMapCache, // Use the same cache to share locks.
-                $importClassName
-            );
-            $subCompiler->compile(); // Throws.
-
-            // Add the imported class hierarchy's own encountered property-
-            // classes to our list of encountered classes. It gives us
-            // everything from their extends-hierarchy and everything from their
-            // own imports. And in case they had multi-level chained imports
-            // (classes that import classes that import classes), it'll actually
-            // be containing a fully recursively resolved and merged sub-import
-            // list. We will get them ALL from the whole tree! Perfect.
-            // NOTE: The merge function de-duplicates keys!
-            $this->uncompiledPropertyClasses = array_merge(
-                $this->uncompiledPropertyClasses,
-                $subCompiler->uncompiledPropertyClasses
-            );
+            $this->_subcompile($importClassName); // Throws.
         }
 
         // Now simply loop through the compiled property map of the imported
@@ -1040,5 +1121,59 @@ class PropertyMapCompiler
         foreach ($this->_propertyMapCache->classMaps[$importClassName] as $importedPropName => $importedPropDefObj) {
             $this->_currentClassPropertyMap[$importedPropName] = $importedPropDefObj;
         }
+    }
+
+    /**
+     * Used internally when this compiler needs to run a sub-compilation.
+     *
+     * Performs the sub-compile. And if it was successful (meaning it had no
+     * auto-rollbacks due to ITS compile() call failing), then we'll merge its
+     * compiler state with our own so that we preserve important state details.
+     *
+     * @param string $className
+     *
+     * @throws BadPropertyDefinitionException
+     * @throws BadPropertyMapException
+     * @throws CircularPropertyMapException
+     */
+    private function _subcompile(
+        $className)
+    {
+        // Sub-compile the target class. If this DOESN'T throw, we know that the
+        // target class successfully exists in the compilation cache afterwards.
+        // NOTE: If it throws, we know that IT has already rolled back all its
+        // changes itself via its own compile()-catch, so WE don't have to worry
+        // about reading its state on error. We ONLY care when it succeeds.
+        $subCompiler = new self( // Throws.
+            false, // Is NOT the root call!
+            $this->_propertyMapCache, // Use the same cache to share locks.
+            $className
+        );
+        $subCompiler->compile(); // Throws.
+
+        // Add its state of successfully compiled classes to our own list of
+        // compiled classes, so that the info is preserved throughout the stack.
+        // NOTE: This is EXTREMELY important, so that we can clear those classes
+        // from the cache in case ANY other step of the compilation chain fails
+        // unexpectedly. Because in that case, we'll NEED to be able to roll
+        // back ALL of our entire compile-chain's property map cache changes!
+        // NOTE: The merge function de-duplicates keys!
+        $this->compiledClasses = array_merge(
+            $this->compiledClasses,
+            $subCompiler->compiledClasses
+        );
+
+        // Add the sub-compiled class hierarchy's own encountered property-
+        // classes to our list of encountered classes. It gives us everything
+        // from their extends-hierarchy and everything from their own imports.
+        // And in case they had multi-level chained imports (classes that import
+        // classes that import classes), it'll actually be containing a FULLY
+        // recursively resolved and merged sub-import list. We will get them ALL
+        // from their WHOLE sub-hierarchy! Exactly as intended.
+        // NOTE: The merge function de-duplicates keys!
+        $this->uncompiledPropertyClasses = array_merge(
+            $this->uncompiledPropertyClasses,
+            $subCompiler->uncompiledPropertyClasses
+        );
     }
 }

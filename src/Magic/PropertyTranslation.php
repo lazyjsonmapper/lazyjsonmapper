@@ -27,31 +27,37 @@ use LazyJsonMapper\Exception\MagicTranslationException;
  *
  * We support "snake_case" and "camelCase" property name style.
  *
- * Translation Examples (result listed first, then what input was used):
+ * ---------------------------------------------------------------------
+ * WARNING:
+ * We do NOT support property names in "HumpBack" notation, whose first word is
+ * uppercased (even if it sits after leading underscores).
  *
- * - "Some0XThing"
- *   snake: "some0_x_thing"
- *   camel: "some0XThing"
+ * For example, "__MessageList" or "MessageList" as HumpBack input are invalid,
+ * but "__message_list"/"message_list" (snake) or "__messageList"/"messageList"
+ * (camel) are valid property names.
  *
- * - "Some0xThing"
- *   snake: "some0x_thing"
- *   camel: "some0xThing"
+ * We WILL however accept HumpBack input and will provide a translation for it,
+ * but it will NOT be possible for FunctionTranslation to translate HumpBack
+ * style back to a property name. Just be aware of that! It's intentional, since
+ * HumpBack style is extremely rare and we save processing by not supporting it.
+ * ---------------------------------------------------------------------
  *
- * - "SomeThing"
- *   snake: "some_thing"
- *   camel: "someThing"
+ * Translation Examples (RESULT LISTED FIRST, then what input was used):
  *
- * - "_MessageList"
- *   snake: "_message_list"
- *   camel: "_messageList"
- *
- * - "__Foo_Bar__XBaz__"
- *   snake: "__foo__bar___x_baz__"
- *   camel: "__foo_Bar__XBaz__"
- *
- * - "___"
- *   snake: "___"
- *   camel: "___"
+ * - "__Foo_Bar__XBaz__" => "__foo__bar___x_baz__" (snake)
+ *                          "__foo_Bar__XBaz__" (camel)
+ * - "0m__AnUn0x"        => "0m___an_un0x" (snake) & "0m__AnUn0x" (camel)
+ * - "Some0XThing"       => "some0_x_thing" (snake) & "some0XThing" (camel)
+ * - "Some0xThing"       => "some0x_thing" (snake) & "some0xThing" (camel)
+ * - "SomeThing"         => "some_thing" (snake) & "someThing" (camel)
+ * - "Something"         => "something" (snake & camel identical; no ucwords)
+ * - "___"               => "___" (snake & camel identical; no ucwords)
+ * - "_0"                => "_0" (snake & camel identical; no ucwords)
+ * - "_Messages"         => "_messages" (snake & camel identical; no ucwords)
+ * - "__MessageList"     => "__message_list" (snake) & "__messageList" (camel)
+ * - "123"               => "123" (snake & camel identical; no ucwords)
+ * - "123prop"           => "123prop" (snake & camel identical; no ucwords)
+ * - "123Prop"           => "123_prop" (snake) & "123Prop" (camel)
  *
  * NOTE: The class validates all parameters, but provides public properties to
  * avoid needless function calls. It's therefore your responsibility to never

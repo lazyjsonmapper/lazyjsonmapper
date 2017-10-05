@@ -58,7 +58,7 @@ class PropertyMapCompiler
     /** @var array Classes that WE have locked during hierarchy compilation. */
     private $_ourCompilerClassLocks;
 
-    /** @var mixed Used for detecting unique (non-inherited) class constants. */
+    /** @var mixed Used by old PHP (before 7.1) for detecting unique (non-inherited) class constants. */
     private $_previousMapConstantValue;
 
     /** @var array The current class we're processing in the hierarchy. */
@@ -665,57 +665,124 @@ class PropertyMapCompiler
     {
         // We must always begin by reflecting its "JSON_PROPERTY_MAP" class
         // constant to determine if this particular class in the hierarchy
-        // re-defines it to a new value (compared to its "extends"-parent). This
-        // just protects against wasting time re-parsing inherited constants
-        // with identical values. (Note that we also have protection against
-        // "identical property re-definitions" further down, which means
-        // re-parsing would be safe, but is useless and a waste of time.)
+        // re-defines its value (compared to inheriting it from its "extends"
+        // parent). This protects against accidentally re-parsing inherited
+        // constants, which would both waste time AND would be VERY dangerous,
+        // since that would re-interpret all inherited relative properties (ones
+        // pointing at classes relative to the class which ACTUALLY declared
+        // that constant) as if they were relative to the INHERITING class
+        // instead, which is VERY wrong (and could lead to classes being either
+        // mismapped or "not found"). Luckily the code below fully protects us
+        // against that scenario, by detecting if our value is "ours" or not.
         try {
-            $rawClassPropertyMap = $this->_currentClassInfo['reflector']
-                                 ->getConstant('JSON_PROPERTY_MAP'); // Throws.
+            // Use different techniques based on what their PHP supports.
+            $foundConstant = false;
+            if (version_compare(PHP_VERSION, '7.1.0') >= 0) {
+                // In PHP 7.1.0 and higher, they've finally added "reflection
+                // constants" which allow us to get accurate extra information.
+                $reflectionConstant = $this->_currentClassInfo['reflector']
+                                    ->getReflectionConstant('JSON_PROPERTY_MAP');
+                if ($reflectionConstant !== false) {
+                    $foundConstant = true;
 
-            // MAGIC: The "!==" ensures that this constant really differs from
-            // its parent. In case of arrays, they are only treated as identical
-            // if both arrays have the same key & value types and values in the
-            // exact same order and same count(). And it checks recursively!
-            $hasDifferentConstant = ($rawClassPropertyMap !== $this->_previousMapConstantValue);
+                    // Just read its value. We don't have to care about its
+                    // isPrivate() flags etc. It lets us read the value anyway.
+                    $rawClassPropertyMap = $reflectionConstant->getValue();
 
-            // --------------------------------------------
-            // TODO: When PHP 7.1 is more commonplace, add a check here for
-            // "\ReflectionClassConstant", and if so instantiate one (via the
-            // currentClassInfo reflector) and then look at getDeclaringClass()
-            // and update $hasDifferentConstant based on its perfect answer.
-            // - Why? To solve a very minor situation:
-            // namespace A { class A { "foo":"B[]" } class B {} }
-            // namespace Z { class Z extends \A\A { "foo":"B[]" } class B {} }
-            // In that situation, Z\Z would inherit the constant from A\A, which
-            // compiled property "foo" as "\A\B". And when we look at Z, we
-            // would see a 100% identical JSON_PROPERTY_MAP constant, so we
-            // would assume that since all the array keys and values match, the
-            // constant was inherited. Therefore the "identical" constant of Z
-            // will not be parsed. And Z's foo will therefore also link to
-            // "\A\B", instead of "\Z\B".
-            // - That situation is extremely rare, because I can't imagine
-            // someone having such a poorly designed inheritance that they
-            // inherit something which refers to a class via a local relative
-            // path, and then they re-define that exact property to their own
-            // local relative path with the exact same name and no other
-            // properties added/changed at all in the whole map, thus making the
-            // maps look identical. It's just weird on so many levels and
-            // unlikely to ever happen.
-            // - However, we cannot solve this until PHP 7.1. Because simply the
-            // alternative of "always re-compile even if the constant was
-            // inherited" would cause an insanely dangerous bug: All relative
-            // class names would get re-interpreted by each inheriting class, as
-            // if the inheriting class was the one that contained a relative
-            // class path. So no, we cannot simply always re-compile. We'll
-            // instead have to live with this very minor problem until PHP 7.1
-            // is commonplace.
-            // --------------------------------------------
+                    // Use PHP7.1's ReflectionClassConstant's ability to tell us
+                    // EXACTLY which class declared the current (inherited or
+                    // new) value for the constant. If OUR class didn't declare
+                    // it, then we know that it was inherited and should NOT be
+                    // parsed again. But if we DID declare its value, then we
+                    // know that we MUST parse it ("has different constant").
+                    // NOTE: This method is 100% accurate even when re-declared
+                    // to the exact same value as the inherited (parent) value!
+                    $hasDifferentConstant = ($reflectionConstant
+                                             ->getDeclaringClass()->getName()
+                                             === $this->_currentClassInfo['className']);
+                }
+            } else {
+                // In older PHP versions, we're pretty limited... we don't get
+                // ANY extra information about the constants. We just get their
+                // values. And if we try to query a specific constant, we get
+                // FALSE if it doesn't exist (which is indistinguishable from it
+                // actually having FALSE values). So we MUST get an array of all
+                // constants to be able to check whether it TRULY exists or not.
+                $classConstants = $this->_currentClassInfo['reflector']
+                                ->getConstants();
+                if (array_key_exists('JSON_PROPERTY_MAP', $classConstants)) {
+                    $foundConstant = true;
 
-            // Update the "previous constant value" since we will be the new
-            // "previous" value after this iteration.
-            $this->_previousMapConstantValue = $rawClassPropertyMap;
+                    // Read its value. Unfortunately old versions of PHP don't
+                    // give us ANY information about which class declared it
+                    // (meaning whether it was inherited or re-declared here).
+                    $rawClassPropertyMap = $classConstants['JSON_PROPERTY_MAP'];
+
+                    // MAGIC: This is the best we can do on old PHP versions...
+                    // The "!==" ensures that this constant really differs from
+                    // its parent. In case of arrays, they are only treated as
+                    // identical if both arrays have the same key & value types
+                    // and values in the exact same order and same count(). And
+                    // it checks recursively!
+                    //
+                    // NOTE: This method is great, but it's not as accurate as
+                    // the perfect PHP 7.1 method. It actually has a VERY TINY
+                    // issue where it will fail to detect a new constant: If you
+                    // manually re-declare a constant to EXACTLY the same value
+                    // as what you would have inherited from your parent
+                    // ("extends") hierarchy, then we won't be able to detect
+                    // that you have a new value. Instead, you will inherit the
+                    // compiled parent class map as if you hadn't declared any
+                    // value of your own at all. In almost all cases, that won't
+                    // matter, and will give you the same result. It only
+                    // matters in a very tiny case which probably won't happen
+                    // to anybody in real-world usage:
+                    //
+                    // namespace A { class A { "foo":"B[]" } class B {} }
+                    // namespace Z { class Z extends \A\A { "foo":"B[]" } class B {} }
+                    //
+                    // In that situation, Z\Z would inherit the constant from
+                    // A\A, which compiled the relative-class "foo" property as
+                    // "\A\B". And when we look at Z's own constant, we would
+                    // see a 100% identical JSON_PROPERTY_MAP constant compared
+                    // to A\A, so we would assume that since all the array keys
+                    // and values match exactly, its constant "was inherited".
+                    // Therefore the "identical" constant of Z will not be
+                    // parsed. And Z's foo will therefore also link to "\A\B",
+                    // instead of "\Z\B".
+                    //
+                    // In reality, I doubt that ANY user would EVER have such a
+                    // weird inheritance structure, with "extends" across
+                    // namespaces and relative paths to classes that exist in
+                    // both namespaces, etc. And the problem above would not be
+                    // able to happen as long as their "Z\Z" map has declared
+                    // ANY other value too (or even just changed the order of
+                    // the declarations), so that we detect that their constant
+                    // differs in "Z\Z". So 99.9999% of users will be safe.
+                    //
+                    // And no... we CAN'T simply always re-interpret it, because
+                    // then we'd get a FAR more dangerous bug, which means that
+                    // ALL relative properties would re-compile every time they
+                    // are inherited, "as if they had been declared by us".
+                    //
+                    // So no, this method really is the BEST that PHP < 7.1 has.
+                    $hasDifferentConstant = ($rawClassPropertyMap
+                                             !== $this->_previousMapConstantValue);
+
+                    // Update the "previous constant value" since we will be the
+                    // new "previous" value after this iteration.
+                    $this->_previousMapConstantValue = $rawClassPropertyMap;
+                }
+            }
+            if (!$foundConstant) {
+                // The constant doesn't exist. Should never be able to happen
+                // since the class inherits from LazyJsonMapper.
+                throw new ReflectionException(
+                    // NOTE: This exception message mimics PHP's own reflection
+                    // error message style.
+                    'Constant JSON_PROPERTY_MAP does not exist'
+                );
+            }
         } catch (ReflectionException $e) {
             // Unable to read the map constant from the class...
             throw new BadPropertyMapException(sprintf(
@@ -842,7 +909,7 @@ class PropertyMapCompiler
                 // Now check if the target class fits the "import class"
                 // requirements.
                 if (class_exists($strictImportClassName)
-                    && is_subclass_of($strictImportClassName, LazyJsonMapper::class)) {
+                    && is_subclass_of($strictImportClassName, '\\'.LazyJsonMapper::class)) {
                     // This is an "import other class" command! Thanks to the
                     // lack of an associative key, we saw a numeric array key
                     // (non-associative). And we've verified (above) that its

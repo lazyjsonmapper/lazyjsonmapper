@@ -86,6 +86,8 @@ class ClassAnalysis
      * @param string $problemMessage   A message describing the actual problem.
      *
      * @throws LazyJsonMapperException If any of the parameters are invalid.
+     *
+     * @see ClassAnalysis::hasProblems()
      */
     public function addProblem(
         $definitionSource,
@@ -128,11 +130,29 @@ class ClassAnalysis
     }
 
     /**
+     * Check whether any problems were discovered.
+     *
+     * In that case, it's recommended to use "generateNiceSummaries()" to format
+     * user-readable messages about the problems.
+     *
+     * @return bool
+     *
+     * @see ClassAnalysis::generateNiceSummaries()
+     */
+    public function hasProblems()
+    {
+        return !empty($this->bad_definitions) || !empty($this->missing_definitions);
+    }
+
+    /**
      * Generates nicely formatted problem summaries for this class analysis.
      *
      * @return array An array with formatted messages for every type of analysis
      *               which actually had errors, keyed by the problem type. If no
      *               errors, the returned array will be empty.
+     *
+     * @see ClassAnalysis::hasProblems()
+     * @see ClassAnalysis::generateNiceSummariesAsString()
      */
     public function generateNiceSummaries()
     {
@@ -167,5 +187,22 @@ class ClassAnalysis
         }
 
         return $problemSummaries;
+    }
+
+    /**
+     * Generates a nicely formatted problem summary string for this class analysis.
+     *
+     * This helper combines all summaries and returns them as a single string
+     * (rather than as an array), which is very useful when displaying ALL
+     * errors to a user as a message.
+     *
+     * @return string The final string. Is an empty string if no errors exist.
+     *
+     * @see ClassAnalysis::hasProblems()
+     * @see ClassAnalysis::generateNiceSummaries()
+     */
+    public function generateNiceSummariesAsString()
+    {
+        return implode(' ', $this->generateNiceSummaries());
     }
 }

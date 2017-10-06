@@ -18,6 +18,7 @@
 namespace LazyJsonMapper\Exception;
 
 use LazyJsonMapper\LazyJsonMapper;
+use LazyJsonMapper\Utilities;
 
 /**
  * Means that a user-option constant prevented normal execution.
@@ -33,4 +34,50 @@ use LazyJsonMapper\LazyJsonMapper;
  */
 class LazyUserOptionException extends LazyUserException
 {
+    /** @var int */
+    const ERR_DEFAULT = 0;
+
+    /** @var int */
+    const ERR_VIRTUAL_PROPERTIES_DISABLED = 1;
+
+    /** @var int */
+    const ERR_VIRTUAL_FUNCTIONS_DISABLED = 2;
+
+    /**
+     * Constructor.
+     *
+     * @param LazyJsonMapper $owner
+     * @param int            $errorCode
+     */
+    public function __construct(
+        LazyJsonMapper $owner,
+        $errorCode = self::ERR_DEFAULT)
+    {
+        // It is very important that we pinpoint exactly which class triggered
+        // the error, since the user may have chained operators and traveled
+        // deep within an object hierarchy.
+        $className = Utilities::createStrictClassPath(get_class($owner));
+        switch ($errorCode) {
+        case self::ERR_VIRTUAL_PROPERTIES_DISABLED:
+            $message = sprintf(
+                'Virtual property access is disabled for class "%s".',
+                $className
+            );
+            break;
+        case self::ERR_VIRTUAL_FUNCTIONS_DISABLED:
+            $message = sprintf(
+                'Virtual functions are disabled for class "%s".',
+                $className
+            );
+            break;
+        default:
+            $errorCode = self::ERR_DEFAULT;
+            $message = sprintf(
+                'Action forbidden by options for class "%s".',
+                $className
+            );
+        }
+
+        parent::__construct($message, $errorCode);
+    }
 }

@@ -38,7 +38,7 @@ echo "[pre-commit] Checking work-tree codestyle..."
 
 # Check the general codestyle format.
 echo "> Verifying php-cs-fixer..."
-vendor/bin/php-cs-fixer fix --config=.php_cs.dist --dry-run
+vendor/bin/php-cs-fixer fix --config=.php_cs.dist --allow-risky yes --dry-run
 if [ $? -ne 0 ]; then
     failed="yes"
 fi

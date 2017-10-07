@@ -1,7 +1,7 @@
 {
     "name": "lazyjsonmapper/lazyjsonmapper",
     "type": "library",
-    "description": "",
+    "description": "Advanced, intelligent & automatic object-oriented JSON containers for PHP.",
     "keywords": ["json", "development"],
     "homepage": "https://github.com/SteveJobzniak/LazyJsonMapper",
     "license": "Apache-2.0",
@@ -17,7 +17,7 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^6.0",
-        "friendsofphp/php-cs-fixer": "^2.6"
+        "friendsofphp/php-cs-fixer": "^2.7.1"
     },
     "autoload": {
         "psr-4": {

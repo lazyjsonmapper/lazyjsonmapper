@@ -606,8 +606,16 @@ class LazyJsonMapper implements Serializable
      * to risk breaking it (especially since you must then perfectly maintain an
      * identical constructor argument list and types of thrown exceptions, and
      * would always have to remember to call our constructor first, and so on).
+     *
+     * Furthermore, trying to have custom constructors on "JSON data container
+     * objects" MAKES NO SENSE AT ALL, since your JSON data objects can be
+     * created recursively and automatically from nested JSON object data. So
+     * there's no way you could run your object's custom constructors then!
+     *
      * Instead, there is a separate `_init()` function which you can override in
-     * your subclasses, for safe custom initialization.
+     * your subclasses, for safe custom initialization. And if you NEED to use
+     * some external variables in certain functions in your JSON data classes,
+     * then simply add those variables as arguments to those class-functions!
      *
      * Also note that there are many reasons why the JSON data must be provided
      * as an array instead of as an object. Most importantly, the memory usage

@@ -228,7 +228,7 @@ class PropertyDescription
         $this->function_is = sprintf('bool is%s()', $translation->propFuncCase);
         $this->function_get = sprintf('%s get%s()', $finalType, $translation->propFuncCase);
         $this->function_set = sprintf('$this set%s(%s $value)', $translation->propFuncCase, $finalType);
-        $this->function_unset = sprintf('void unset%s()', $translation->propFuncCase);
+        $this->function_unset = sprintf('$this unset%s()', $translation->propFuncCase);
         $this->func_case = $translation->propFuncCase;
     }
 }

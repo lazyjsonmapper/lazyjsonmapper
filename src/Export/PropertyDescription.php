@@ -151,6 +151,15 @@ class PropertyDescription
     public $function_unset;
 
     /**
+     * The bare "FuncCase" translation of the property name.
+     *
+     * Might be helpful for very advanced users.
+     *
+     * @var string
+     */
+    public $func_case;
+
+    /**
      * Constructor.
      *
      * @param LazyJsonMapper     $ownerClass            Class instance which
@@ -220,5 +229,6 @@ class PropertyDescription
         $this->function_get = sprintf('%s get%s()', $finalType, $translation->propFuncCase);
         $this->function_set = sprintf('$this set%s(%s $value)', $translation->propFuncCase, $finalType);
         $this->function_unset = sprintf('void unset%s()', $translation->propFuncCase);
+        $this->func_case = $translation->propFuncCase;
     }
 }

@@ -1760,6 +1760,15 @@ var_dump($x->asStdClass());
 
 var_dump('---------------------');
 
+// test new data assignment at a later time via assignObjectData():
+$foo = new Test(['just_a_string' => '123']);
+$foo->printPropertyDescriptions();
+$foo->printJson();
+$foo->assignObjectData(['camelCaseProp' => 999, 'string_array' => ['a', 'b', 'c']]);
+$foo->printJson();
+
+var_dump('---------------------');
+
 class TestJSONArrayKeys extends LazyJsonMapper
 {
     const JSON_PROPERTY_MAP = [

@@ -662,6 +662,7 @@ class LazyJsonMapper implements Serializable
      *                                 exception.
      *
      * @see LazyJsonMapper::_init()
+     * @see LazyJsonMapper::assignObjectData()
      */
     final public function __construct(
         array $objectData = [],
@@ -697,6 +698,40 @@ class LazyJsonMapper implements Serializable
         // The fact that it's a link also avoids the risk of copy-on-write.
         $this->_compiledPropertyMapLink = &self::$_propertyMapCache->classMaps[$thisClassName];
 
+        // Assign the JSON data, run optional analysis, and then _init().
+        $this->assignObjectData($objectData, $requireAnalysis); // Throws.
+    }
+
+    /**
+     * Assign a new internal JSON data array for this object.
+     *
+     * This is used by the constructor for assigning the initial internal data
+     * state, but can also be very useful for users who want to manually replace
+     * the contents of their object at a later time.
+     *
+     * For example, it might suit your project design better to first construct
+     * an empty object, and *then* pass it to some other function which actually
+     * fills it with the JSON data. This function allows you to achieve that.
+     *
+     * The entire internal data storage will be replaced with the new data.
+     *
+     * @param array $objectData      Decoded JSON data as an array (NOT object).
+     * @param bool  $requireAnalysis Whether to analyze the JSON data and throw
+     *                               if there are problems with mapping. See
+     *                               `__construct()` for more details.
+     *
+     * @throws LazyJsonMapperException If JSON data analysis requested and any
+     *                                 of the map's property definitions are
+     *                                 bad/missing. Also if a custom class
+     *                                 `_init()` threw any kind of exception.
+     *
+     * @see LazyJsonMapper::__construct()
+     * @see LazyJsonMapper::_init()
+     */
+    final public function assignObjectData(
+        array $objectData = [],
+        $requireAnalysis = false)
+    {
         // Save the provided JSON data array.
         $this->_objectData = $objectData;
 
@@ -720,9 +755,7 @@ class LazyJsonMapper implements Serializable
         }
 
         // Call the custom initializer, where the subclass can do its own init.
-        // NOTE: This is necessary for safely encapsulating the subclass, and it
-        // helps people since they don't have to replicate the EXACT constructor
-        // arguments in their own classes (which would need hard maintenance).
+        // NOTE: This is necessary for safely encapsulating the subclass' code.
         try {
             $this->_init();
         } catch (LazyUserException $e) {
@@ -737,12 +770,15 @@ class LazyJsonMapper implements Serializable
     }
 
     /**
-     * Initializer for custom subclass construction.
+     * Initializer for custom subclass construction / data updates.
      *
      * This is where you can perform your custom subclass initialization, since
      * you are unable to override the main constructor.
      *
-     * We automatically run this function at the end of the normal constructor.
+     * We automatically run this function at the end of the normal constructor,
+     * as well as every time that you manually use `assignObjectData()` to
+     * replace the object's data. (When new data is assigned, you should treat
+     * yourself as a new object, which is why `_init()` will run again.)
      *
      * WARNING: Please RESIST the urge to touch ANY of the internal JSON data
      * during this initialization. All data will always be automatically
@@ -808,7 +844,12 @@ class LazyJsonMapper implements Serializable
      *  the rest of your project!
      *
      * @throws LazyUserException If there is any fatal error which prevents
-     *                           initialization. This stops object construction.
+     *                           initialization. This stops object construction
+     *                           if this is the initial construction. However,
+     *                           it doesn't affect data-assignment if you throw
+     *                           during a later `assignObjectData()` call.
+     *
+     * @see LazyJsonMapper::assignObjectData()
      */
     protected function _init()
     {

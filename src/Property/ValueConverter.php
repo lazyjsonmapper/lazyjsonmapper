@@ -365,13 +365,34 @@ class ValueConverter
                     // then PHP actually refuses to decode such invalid JSON.
                     // NOTE: If first key is NULL, it means the array is empty. We
                     // must allow empty arrays, since '{"obj":{}}' is valid JSON.
+                    // NOTE: We'll only detect non-object inner arrays if their
+                    // first key is a numeric int(0). Because objects allow
+                    // random numeric keys, but they don't allow sequential ones.
                     reset($value); // Rewind array pointer to its first element.
                     $firstArrKey = key($value); // Get key without moving pointer.
-                    if ($firstArrKey !== null && !is_string($firstArrKey)) {
-                        throw new LazyJsonMapperException(sprintf(
-                            'Unable to convert non-object-array inner value for property "%s" into class "%s".',
-                            $propName, $strictClassPath
-                        ));
+                    if ($firstArrKey !== null && is_int($firstArrKey) && $firstArrKey === 0) {
+                        // Determine whether this is a regular array... If it
+                        // consists entirely of numeric keys starting at 0 and
+                        // going up sequentially without gaps, it's an array...
+                        $isRegularArray = true;
+                        $nextValidKey = 0; // Must start at 0.
+                        foreach ($value as $k => $x) {
+                            if ($k !== $nextValidKey++) { // ++ post increment.
+                                $isRegularArray = false;
+                                break;
+                            }
+                        }
+
+                        // Only throw if it was a totally plain array. This
+                        // check ensures that we still allow objects with
+                        // numeric keys as long as they aren't 100%
+                        // indistinguishable from a regular array.
+                        if ($isRegularArray) {
+                            throw new LazyJsonMapperException(sprintf(
+                                'Unable to convert non-object-array inner value for property "%s" into class "%s".',
+                                $propName, $strictClassPath
+                            ));
+                        }
                     }
 
                     // Convert the raw JSON array value to its assigned class object.

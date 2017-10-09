@@ -470,19 +470,186 @@ foreach ($unpredictable3->getEmployees() as $employeeId => $employeeInfo) {
 }
 
 /*
+ * But wait... there's yet another way to solve this!
+ *
+ * Since we know that our "mixture container"'s `employees` value is a key-value
+ * storage of User objects, in other words it's "an unpredictable key-value
+ * container", then we CAN just tell LazyJsonMapper to map that property to a
+ * `UnpredictableContainer[WithSetter]` which we defined earlier. That way, the
+ * "employees" values are handled automatically by a neat sub-container.
+ *
+ * In fact, we could do something even better! We could define a basic
+ * "unpredictable keys" container, and then define subclasses of it for various
+ * types of unpredictable containers. Let's do that instead!
+ */
+
+/**
+ * This class defines a core "untyped" container for unpredictable data.
+ */
+class CoreUnpredictableContainer extends LazyJsonMapper
+{
+    // Let's disable direct access to this container via anything other than
+    // the functions that WE define ourselves! That way, people cannot use
+    // virtual properties/functions to manipulate the core data storage.
+    const ALLOW_VIRTUAL_PROPERTIES = false;
+    const ALLOW_VIRTUAL_FUNCTIONS = false;
+
+    /** @var array */
+    protected $_cache;
+
+    /** @var string */
+    protected $_type;
+
+    /**
+     * Get the data array of this unpredictable container.
+     *
+     * @throws LazyJsonMapperException
+     *
+     * @return array
+     */
+    public function getData()
+    {
+        if ($this->_cache === null) {
+            $this->_cache = $this->asArray(); // Throws.
+        }
+
+        if ($this->_type !== null) {
+            foreach ($this->_cache as &$value) {
+                if (is_array($value)) {
+                    $value = new $this->_type($value); // Throws.
+                }
+            }
+        }
+
+        return $this->_cache;
+    }
+
+    /**
+     * Set the data array of this unpredictable container.
+     *
+     * @param array $value The new data array.
+     *
+     * @throws LazyJsonMapperException
+     *
+     * @return $this
+     */
+    public function setData(
+        array $value)
+    {
+        $this->_cache = $value;
+
+        $newObjectData = [];
+        foreach ($this->_cache as $k => $v) {
+            $newObjectData[$k] = is_object($v) && $v instanceof LazyJsonMapper
+                               ? $v->asArray() // Throws.
+                               : $v; // Is already a valid value.
+        }
+
+        $this->assignObjectData($newObjectData); // Throws.
+
+        return $this;
+    }
+}
+
+/**
+ * This class defines an "unpredictable container of User objects".
+ *
+ * It's very easy to define other containers. Simply create them like this and
+ * override their `$_type` property to any other valid LazyJsonMapper class.
+ */
+class UserUnpredictableContainer extends CoreUnpredictableContainer
+{
+    // The FULL path to the target class, with leading backslash!
+    // NOTE: The leading backslash ensures it's found via a strict, global path.
+    protected $_type = '\User';
+}
+
+/**
+ * This is our new and improved, final class!
+ *
+ * Here is our final object for mapping our unpredictable "employees" data...
+ * As you can see, it is much easier to create this class now that we have
+ * defined a core, re-usable "unpredictable container" above.
+ */
+class UnpredictableMixtureContainerTwo extends LazyJsonMapper
+{
+    const JSON_PROPERTY_MAP = [
+        // This holds a regular User object.
+        'manager'   => 'User',
+        // This property is an unpredictable container of User objets.
+        'employees' => 'UserUnpredictableContainer',
+    ];
+}
+
+/*
+ * Let's try it out!
+ */
+$unpredictable_json4 = <<<EOF
+{
+    "manager": {
+        "name": "Unpredictable Manager"
+    },
+    "employees":{
+        "12": {
+            "name": "Unpredictable Employee"
+        },
+        "193": {
+            "name": "Sam Fisher... again!"
+        }
+    }
+}
+EOF;
+
+echo "\n\nUnpredictable data #4, with mixturecontainertwo and coreunpredictablecontainer:\n";
+$unpredictable4 = new UnpredictableMixtureContainerTwo(json_decode($unpredictable_json4, true));
+
+/*
+ * Let's look at all current data.
+ *
+ * Note that we use `getData()` to get the unpredictable container's values.
+ */
+$unpredictable4->printJson();
+printf("The manager's name is: %s\n", $unpredictable4->getManager()->getName());
+foreach ($unpredictable4->getEmployees()->getData() as $employeeId => $employeeInfo) {
+    printf("- Employee #%s, Name: %s\n", $employeeId, $employeeInfo->getName());
+}
+
+/*
+ * And let's update the value of the inner, unpredictable container!
+ *
+ * The container itself takes care of updating the LazyJsonMapper data storage!
+ */
+$unpredictable4->getEmployees()->setData([
+    '123' => ['name' => 'Final Employee 123'],
+    '456' => ['name' => 'Final Employee 456'],
+]);
+
+/*
+ * Now finish by looking at all of the data again, via the LazyJsonMapper core
+ * object and via the `getEmployees()` object's cache... They are identical!
+ */
+$unpredictable4->printJson();
+printf("The manager's name is: %s\n", $unpredictable4->getManager()->getName());
+foreach ($unpredictable4->getEmployees()->getData() as $employeeId => $employeeInfo) {
+    printf("- Employee #%s, Name: %s\n", $employeeId, $employeeInfo->getName());
+}
+
+/*
  * And that's it! Hopefully you NEVER have to work with nasty, unpredictable
  * data like this. If you're able to control the JSON format, you should always
- * design it properly with known keys instead. But at least you now know several
- * methods for working with objects that have unpredictable keys!
+ * design it properly with known keys instead. But at least you now know about
+ * multiple great methods for working with objects that have unpredictable keys!
  *
- * There are other methods too, such as if your data contains a blend of known
+ * There are other methods too, such as if your class contains a blend of known
  * (defined) keys and unpredictable keys, in which case you'd need to fetch via
- * `asArray()` as in the `UnpredictableContainer` example, but then you'd simply
+ * `asArray()` as in the `UnpredictableContainer` example, and then you'd simply
  * filter out all known keys from your cache, to get _just_ the unpredictable
  * keys. And if you need setters in that scenario, your setter functions would
  * be a bit more complex since they would need to use `assignObjectData()` AND
- * would have to provide BOTH the known data AND the unknown data. But I leave
- * that extremely rare scenario as an excercise for you, dear reader!
+ * would have to provide BOTH the known data AND the unknown data. One way of
+ * doing that would be to use `_getProperty()` to merge in the CURRENT values of
+ * each core property into your NEW object-data array BEFORE you assign it. But
+ * I leave that extremely rare scenario as an excercise for you, dear reader!
  *
  * You should go out and adapt all of this code to fit your own needs! ;-)
  *
@@ -494,14 +661,17 @@ foreach ($unpredictable3->getEmployees() as $employeeId => $employeeInfo) {
  * If you don't need setters/syncing, then skip all of that code.
  *
  * You may also want to disable the user-options `ALLOW_VIRTUAL_PROPERTIES` and
- * `ALLOW_VIRTUAL_FUNCTIONS` for your unpredictable containers, so users cannot
+ * `ALLOW_VIRTUAL_FUNCTIONS` on your unpredictable containers, so users cannot
  * manipulate the unpredictable data via LazyJsonMapper's automatic functions!
+ * That's what we did for CoreUnpredictableContainer, to ensure that nobody can
+ * destroy its internal data by touching it directly. They can only manipulate
+ * the data via its safe, public `getData()` and `setData()` functions!
  *
- * And you may perhaps prefer to write a custom base-class which has a few
+ * And you may perhaps prefer to write a custom base-class which has a few other
  * helper-functions for doing these kinds of data translations, caching and
- * syncing, to make your own work easier. That way, your various classes could
- * just call your internal helper functions to do the required processing
- * automatically.
+ * syncing, to make your own work easier (such as the CoreUnpredictableContainer
+ * example above). That way, your various sub-classes could just call your
+ * internal helper functions to do the required processing automatically! :-)
  *
  * The possibilities are endless! Have fun!
  */

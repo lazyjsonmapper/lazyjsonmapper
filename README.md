@@ -170,6 +170,12 @@ composer require lazyjsonmapper/lazyjsonmapper
 
 View the contents of the [`examples/`](https://github.com/SteveJobzniak/LazyJsonMapper/tree/master/examples) folder.
 
+### Documentation
+
+Everything is fully documented directly within the source code of this library.
+
+You can also [read the same documentation online](https://stevejobzniak.github.io/lazyjsonmapper-docs/namespaces/LazyJsonMapper.html) as nicely formatted HTML pages.
+
 ### Copyright
 
 Copyright 2017 The LazyJsonMapper Project

@@ -484,7 +484,19 @@ foreach ($unpredictable3->getEmployees() as $employeeId => $employeeInfo) {
  */
 
 /**
- * This class defines a core "untyped" container for unpredictable data.
+ * This class defines a core "untyped" container of unpredictable data-keys.
+ *
+ * Unpredictable data is data with keys that cannot be known ahead of time, such
+ * as objects whose values are keyed by things like user IDs.
+ *
+ * Here's an example of such unpredictable data: `{"9323":{"name":"foo"}}`
+ *
+ * The `getData()` function retrieves all key-value pairs, converted to the
+ * optional `$_type` (if one is set via a subclass). And `setData()` writes
+ * the new data back into the core `LazyJsonMapper` container. Most people will
+ * not need to use the setter. It's just provided as an extra feature.
+ *
+ * @author SteveJobzniak (https://github.com/SteveJobzniak)
  */
 class CoreUnpredictableContainer extends LazyJsonMapper
 {
@@ -494,10 +506,25 @@ class CoreUnpredictableContainer extends LazyJsonMapper
     const ALLOW_VIRTUAL_PROPERTIES = false;
     const ALLOW_VIRTUAL_FUNCTIONS = false;
 
-    /** @var array */
+    /**
+     * Data cache to avoid constant processing every time the getter is used.
+     *
+     * @var array
+     */
     protected $_cache;
 
-    /** @var string */
+    /**
+     * What class-type to convert all sub-object values into.
+     *
+     * Defaults to no conversion. Override this value via a subclass!
+     *
+     * Always use the FULL path to the target class, with a leading backslash!
+     * The leading backslash ensures that it's found via a strict, global path.
+     *
+     * Example: `\Foo\BarClass`.
+     *
+     * @var string
+     */
     protected $_type;
 
     /**

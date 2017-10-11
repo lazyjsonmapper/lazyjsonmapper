@@ -1,6 +1,9 @@
 # ignore the lockfile for this library
 composer.lock
 
+# auto-generated documentation folder
+docs/
+
 # third party libraries
 vendor/
 .php_cs

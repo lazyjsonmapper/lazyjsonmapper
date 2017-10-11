@@ -1,0 +1,12 @@
+{
+    "use-cscope": null,
+    "filter": {
+        "php-file-ext-list": [
+            "php"
+        ],
+        "php-path-list": [
+            "./src"
+        ],
+        "php-path-list-without-subdir": []
+    }
+}

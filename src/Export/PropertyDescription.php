@@ -27,7 +27,7 @@ use LazyJsonMapper\Utilities;
 /**
  * Provides a human-readable description of a compiled PropertyDefinition.
  *
- * NOTE: The class validates all parameters, but provides public properties to
+ * `NOTE:` The class validates all parameters, but provides public properties to
  * avoid needless function calls. It's therefore your responsibility to never
  * assign any bad values to the public properties after this object's creation!
  *
@@ -42,7 +42,7 @@ class PropertyDescription
     /**
      * The strict, global path to the class which owns this property.
      *
-     * Examples: "\MyNamespace\MyClass" or "\MyGlobalClass".
+     * Examples: `\MyNamespace\MyClass` or `\MyGlobalClass`.
      *
      * @var string
      */
@@ -55,16 +55,17 @@ class PropertyDescription
      * undefined properties will be inaccessible as soon as they are missing
      * from the data, whereas class properties are always accessible.
      *
-     * @var bool Is TRUE if the property is defined in the class map, otherwise
-     *           FALSE if this property only exists within the current class
-     *           instance's data.
+     * Is `TRUE` if the property is defined in the class map, otherwise `FALSE`
+     * if this property only exists within the current class instance's data.
+     *
+     * @var bool
      */
     public $is_defined;
 
     /**
      * The JSON data name of the property.
      *
-     * Examples: "some_property".
+     * Examples: `some_property`.
      *
      * @var string
      */
@@ -73,32 +74,37 @@ class PropertyDescription
     /**
      * The property type in PHPdoc format.
      *
-     * Examples: "int[]", "mixed", "mixed[][]", "\Foo\Bar[]", "\Baz".
+     * Examples: `int[]`, `mixed`, `mixed[][]`, `\Foo\Bar[]`, `\Baz`.
      *
      * @var string
      */
     public $type;
 
     /**
-     * Whether the type is a basic PHP type (mixed, int, float, string or bool).
+     * Whether the type is a basic PHP type.
      *
-     * Note that "mixed" is simply an alias for "allow any of the basic types,
-     * as well as arrays of those basic types".
+     * Basic types are `mixed`, `int`, `float`, `string` or `bool`.
      *
-     * @var bool Is TRUE if basic type, or FALSE if object type.
+     * Note that `mixed` is simply an alias for "allow any of the basic types,
+     * as well as arrays of those basic types" (although it's worth noting that
+     * `mixed[]` for example would enforce a depth of 1 with no deeper arrays).
+     *
+     * Is `TRUE` if basic type, or `FALSE` if object type.
+     *
+     * @var bool
      */
     public $is_basic_type;
 
     /**
      * Whether the type is a relative class path (relative to owner class).
      *
-     * Examples: Imagine that the owning class is "\Foo\Bar", and the type is
-     * "\Foo\Xyz". In that case, the type is not a relative path. However, if
-     * the type had been "Xyz", it would be marked as relative.
+     * Examples: Imagine that the `$owner` is `\Foo\Bar`, and the `$type` is
+     * `\Foo\Xyz`. In that case, the type is not a relative path. However, if
+     * the type had been `Xyz`, it would be marked as relative here.
      *
-     * This is always FALSE for basic types. And is only TRUE for object types
-     * if the path is actually relative. That's only possible when the target
-     * class type lives within the same namespace as the owner.
+     * This is always `FALSE` for basic types. And is only `TRUE` for object
+     * types if the path is actually relative. That's only possible when the
+     * target class type lives within the same namespace as the owner.
      *
      * @var bool
      */
@@ -116,7 +122,7 @@ class PropertyDescription
     /**
      * The signature of the isX()-function.
      *
-     * This function checks whether the property exists and evaluates to true.
+     * This function checks whether the property exists and evaluates to `TRUE`.
      *
      * @var string
      */
@@ -167,7 +173,7 @@ class PropertyDescription
      * @param string             $propName              The JSON property name.
      * @param PropertyDefinition $propDef               Compiled definition of
      *                                                  the property.
-     * @param bool               $allowRelativeTypePath If TRUE, object types
+     * @param bool               $allowRelativeTypePath If `TRUE`, object types
      *                                                  will use relative paths
      *                                                  (compared to the owner
      *                                                  class), when possible.

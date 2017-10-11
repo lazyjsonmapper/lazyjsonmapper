@@ -23,10 +23,10 @@ use LazyJsonMapper\LazyJsonMapper;
 /**
  * Container for the result of a LazyJsonMapper class analysis.
  *
- * Describes any problems (bad/missing definitions) of a LazyJsonMapper class
+ * Describes any problems (bad/missing definitions) of a `LazyJsonMapper` class
  * property map versus its actual object instance's JSON data.
  *
- * NOTE: The class validates all parameters, but provides public properties to
+ * `NOTE:` The class validates all parameters, but provides public properties to
  * avoid needless function calls. It's therefore your responsibility to never
  * assign any bad values to the public properties after this object's creation!
  *
@@ -81,8 +81,8 @@ class ClassAnalysis
      * Adds a problem description to the internal state.
      *
      * @param string $definitionSource The class which has the problem.
-     * @param string $problemType      Type of problem. Either "bad_definitions"
-     *                                 or "missing_definitions".
+     * @param string $problemType      Type of problem. Either `bad_definitions`
+     *                                 or `missing_definitions`.
      * @param string $problemMessage   A message describing the actual problem.
      *
      * @throws LazyJsonMapperException If any of the parameters are invalid.
@@ -113,7 +113,7 @@ class ClassAnalysis
      *
      * Removes all duplicate messages and sorts everything nicely. It is
      * recommended to only call this function a single time, on the final
-     * ClassAnalysis object (after all other steps are finished).
+     * `ClassAnalysis` object (after all other steps are finished).
      */
     public function sortProblemLists()
     {
@@ -132,7 +132,7 @@ class ClassAnalysis
     /**
      * Check whether any problems were discovered.
      *
-     * In that case, it's recommended to use "generateNiceSummaries()" to format
+     * In that case, it's recommended to use `generateNiceSummaries()` to format
      * user-readable messages about the problems.
      *
      * @return bool

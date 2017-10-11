@@ -22,9 +22,9 @@ use LazyJsonMapper\LazyJsonMapper;
 /**
  * Means that there was a problem serializing or unserializing the object data.
  *
- * This specifically refers only to the serialize() and unserialize() functions
- * and the data or parameters they are processing. It's intended to help you
- * catch and detect problems with your specific raw data serialization.
+ * This specifically refers only to the `serialize()` and `unserialize()`
+ * functions and the data or parameters they are processing. It's intended to
+ * help you catch and detect problems with your specific raw data serialization.
  *
  * There may still be other exceptions thrown as well. Read the function docs.
  *

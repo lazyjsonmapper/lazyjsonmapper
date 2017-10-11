@@ -30,12 +30,12 @@ class Utilities
      * Create a strict, global class path.
      *
      * This helper ensures that the input is a non-empty string, and then
-     * automatically prepends a leading "\" if missing, so that PHP understands
+     * automatically prepends a leading `\` if missing, so that PHP understands
      * that the class search MUST happen only in the global namespace.
      *
      * @param string $className The class name to convert.
      *
-     * @return string|null String if non-empty string input, otherwise NULL.
+     * @return string|null String if non-empty string input, otherwise `NULL`.
      */
     public static function createStrictClassPath(
         $className = '')
@@ -55,13 +55,13 @@ class Utilities
     /**
      * Splits a strict class-path into its namespace and class name components.
      *
-     * To rejoin them later, just use: 'namespace' + '\\' + 'class'.
+     * To rejoin them later, just use: `'namespace' + '\\' + 'class'`.
      *
-     * The class path should be in get_class() aka TheClass::class format.
+     * The class path should be in `get_class()` aka `TheClass::class` format.
      *
-     * @param string $strictClassPath Class output of createStrictClassPath().
+     * @param string $strictClassPath Class output of `createStrictClassPath()`.
      *
-     * @return array Associative array with keys 'namespace' and 'class'.
+     * @return array Associative array with keys for `namespace` and `class`.
      *
      * @see Utilities::createStrictClassPath()
      */
@@ -85,12 +85,12 @@ class Utilities
     /**
      * Compare two class paths and generate the shortest path between them.
      *
-     * @param array $sourceComponents Source class output of splitClassPath().
-     * @param array $targetComponents Target class output of splitClassPath().
+     * @param array $sourceComponents Source class as `splitStrictClassPath()`.
+     * @param array $targetComponents Target class as `splitStrictClassPath()`.
      *
      * @return string The final path to reach from the source to the target.
      *
-     * @see Utilities::splitClassPath()
+     * @see Utilities::splitStrictClassPath()
      */
     public static function createRelativeClassPath(
         array $sourceComponents,

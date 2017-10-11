@@ -29,19 +29,30 @@ use LazyJsonMapper\Utilities;
  */
 class ValueConverter
 {
+    /**
+     * Convert an outgoing internal value for external use.
+     *
+     * @var int
+     */
     const CONVERT_FROM_INTERNAL = 1;
+
+    /**
+     * Convert an incoming external value to internal storage.
+     *
+     * @var int
+     */
     const CONVERT_TO_INTERNAL = 2;
 
     /**
      * Validate and convert an incoming or outgoing object data property.
      *
-     * If any value is a literal NULL, it will be accepted as-is.
+     * If any value is a literal `NULL`, it will be accepted as-is.
      *
      * If no type-conversion is assigned to a value, then it will undergo a
-     * check to verify that it only holds basic PHP types (int, float, string,
-     * bool or NULL), or arrays of those types. Also note that untyped values
-     * with an array-depth specifier will undergo strict depth validation just
-     * like any other typed value.
+     * check to verify that it only holds basic PHP types (`int`, `float`,
+     * `string`, `bool` or `NULL`), or arrays of those types. Also note that
+     * untyped (mixed) values with an array-depth specifier will undergo strict
+     * depth validation just like any other typed value.
      *
      * In all cases where the input type is specified to be an array of values,
      * all values in the array will be processed recursively to the specified
@@ -54,29 +65,33 @@ class ValueConverter
      *
      * Type conversion behavior depends on the data direction:
      *
-     * Incoming (CONVERT_TO_INTERNAL):
+     * #### Incoming (`CONVERT_TO_INTERNAL`):
      *
-     *  Processes a new value for an object data property to ensure correctness.
+     * - Processes a new value for an object property to ensure correctness.
      *
-     *  Verifies that the new value matches the correct type for the property and
-     *  does type-casting of built-in PHP types and verification of object types.
+     * - Verifies that the new value matches the correct type for the property
+     *   and does type-casting of built-in PHP types and verification of object
+     *   types.
      *
-     * Outgoing (CONVERT_FROM_INTERNAL):
+     * #### Outgoing (`CONVERT_FROM_INTERNAL`):
      *
-     *  Converts an object data property to its assigned class or built-in PHP type.
+     * - Converts an object property to its assigned class or built-in PHP type.
      *
-     *  Performs automatic casting of basic PHP types, along with non-recursive
-     *  lazy-creation of class objects (the first time it encounters any
-     *  unconverted objects at the currently requested property's depth). The
-     *  non-recursion is intentional, for performance and memory purposes.
-     *  Objects within the created objects will remain as basic JSON-array data
-     *  until you actually access them, at which point they're lazy-created too.
+     * - Performs automatic casting of basic PHP types, along with non-recursive
+     *   lazy-creation of class objects (the first time it encounters any
+     *   unconverted objects at the currently requested property's depth). The
+     *   non-recursion is intentional, for performance and memory purposes.
+     *   Objects within the created objects will remain as basic JSON-array data
+     *   until you actually access them, at which point they're lazy-created
+     *   too.
      *
-     * @param int                $direction     One of the CONVERT_* constants.
-     * @param mixed              &$value        The value to be converted. Will
+     * @param int                $direction     One of the `CONVERT_*` constants.
+     * @param mixed              $value         The value to be converted. Will
      *                                          be passed as reference.
      * @param int                $remArrayDepth Remaining array-depth until we
-     *                                          reach the typed values.
+     *                                          reach the typed values. Should
+     *                                          be initialized to the value of
+     *                                          `$propDef->arrayDepth`.
      * @param string             $propName      The name of the property. For
      *                                          exception messages.
      * @param PropertyDefinition $propDef       An object describing the property.

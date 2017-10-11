@@ -18,7 +18,9 @@
 namespace LazyJsonMapper\Exception;
 
 /**
- * ...NOBODY expects the Spanish Inquisition!
+ * NOBODY expects the Spanish Inquisition!
+ *
+ * Congratulations, you have found an easter egg. :-)
  *
  * @copyright 2017 The LazyJsonMapper Project
  * @license http://www.apache.org/licenses/LICENSE-2.0

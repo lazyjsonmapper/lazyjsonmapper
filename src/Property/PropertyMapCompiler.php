@@ -43,7 +43,7 @@ class PropertyMapCompiler
     /** @var string Path of the solve-class, without leading backslash. */
     private $_solveClassName;
 
-    /** @var string Strict global path (leading backslash) to solve-class. */
+    /** @var string Strict global path (with leading backslash) to solve-class. */
     private $_strictSolveClassName;
 
     /** @var array All classes that were compiled by us or our sub-compilers. */
@@ -105,7 +105,8 @@ class PropertyMapCompiler
      * just relax and fully trust that all of your class maps are perfect! :-)
      *
      * If there are ANY compilation problems, then an automatic rollback takes
-     * place which restores the PropertyMapCache to its original pre-call state.
+     * place which restores the `PropertyMapCache` to its original pre-call
+     * state.
      *
      * This compiler algorithm provides perfect peace of mind. If it doesn't
      * throw any errors, it means that your entire class hierarchy has been
@@ -115,20 +116,21 @@ class PropertyMapCompiler
      *                                           and lookups. Will be written to.
      * @param string           $solveClassName   The full path of the class to
      *                                           compile, but without any
-     *                                           leading "\" global prefix. To
+     *                                           leading `\` global prefix. To
      *                                           save time, we assume the caller
      *                                           has already verified that it is
-     *                                           a valid LazyJsonMapper class.
+     *                                           a valid `LazyJsonMapper` class.
      *
      * @throws BadPropertyDefinitionException If there is a problem with any of
      *                                        the property definitions.
      * @throws BadPropertyMapException        If there is a problem with the
      *                                        map structure itself.
-     * @throws CircularPropertyMapException   If there are bad circular map imports
-     *                                        within either the hierarchy (parents)
-     *                                        or the imports of any part of the
-     *                                        class you're trying to compile.
-     *                                        This is a serious exception!
+     * @throws CircularPropertyMapException   If there are bad circular map
+     *                                        imports within either the class
+     *                                        hierarchy (parents) or the imports
+     *                                        of any part of the class you're
+     *                                        trying to compile. This is a
+     *                                        serious exception!
      */
     public static function compileClassPropertyMap(
         PropertyMapCache $propertyMapCache,
@@ -148,7 +150,12 @@ class PropertyMapCompiler
      * @param bool             $isRootCompiler   Whether this is the root-level
      *                                           compiler in a compile-stack.
      * @param PropertyMapCache $propertyMapCache The class/lock cache to use.
-     * @param string           $solveClassName   Name of the class to compile.
+     * @param string           $solveClassName   The full path of the class to
+     *                                           compile, but without any
+     *                                           leading `\` global prefix. To
+     *                                           save time, we assume the caller
+     *                                           has already verified that it is
+     *                                           a valid `LazyJsonMapper` class.
      *
      * @throws BadPropertyMapException
      */
@@ -281,7 +288,7 @@ class PropertyMapCompiler
      * Compile the solve-class, and its parent/import hierarchy (as-necessary).
      *
      * Intelligently watches for compilation errors, and if so it performs an
-     * auto-rollback of ALL classes compiled by this compile()-call AND by all
+     * auto-rollback of ALL classes compiled by this `compile()`-call AND by all
      * of its recursive sub-compilations (if any took place).
      *
      * It performs the rollback if there were ANY issues with the solve-class or
@@ -297,7 +304,7 @@ class PropertyMapCompiler
      * and final success-validation doesn't happen until the top-level
      * rootCompiler is reached again, since it's the job of the root to handle
      * the recursive compilation and resolving of all classes encountered in
-     * properties. So it's only the rootCompiler's compile()-call that TRULY
+     * properties. So it's only the rootCompiler's `compile()`-call that TRULY
      * matters and will determine whether EVERYTHING was successful or not.
      *
      * Basically: If we fail ANY aspect of the request to compile, then we'll
@@ -875,8 +882,11 @@ class PropertyMapCompiler
      * Validates and compiles a map entry, and merges it with the current class
      * property map if everything went okay and the entry was new/different.
      *
-     * @param string $propName
-     * @param string $propDefStr
+     * @param string|int $propName   The property name, or a numeric array key.
+     * @param mixed      $propDefStr Should be a string describing the property
+     *                               or the class to import, but may be
+     *                               something else if the user has written an
+     *                               invalid class property map.
      *
      * @throws BadPropertyDefinitionException
      * @throws BadPropertyMapException
@@ -948,8 +958,8 @@ class PropertyMapCompiler
      * class' final compiled map, IF the definition is valid and describes a
      * new/different value compared to what's already in the current class map.
      *
-     * @param string $propName
-     * @param string $propDefStr
+     * @param string $propName   The property name.
+     * @param string $propDefStr A string describing the property.
      *
      * @throws BadPropertyDefinitionException
      */
@@ -1040,7 +1050,11 @@ class PropertyMapCompiler
     /**
      * Import another class map into the current class.
      *
-     * @param string $strictImportClassName
+     * @param string $strictImportClassName The strict, global path to the
+     *                                      class, with leading backslash `\`.
+     *                                      To save time, we assume the caller
+     *                                      has already verified that it is a
+     *                                      valid `LazyJsonMapper` class.
      *
      * @throws BadPropertyDefinitionException
      * @throws BadPropertyMapException
@@ -1194,10 +1208,13 @@ class PropertyMapCompiler
      * Used internally when this compiler needs to run a sub-compilation.
      *
      * Performs the sub-compile. And if it was successful (meaning it had no
-     * auto-rollbacks due to ITS compile() call failing), then we'll merge its
+     * auto-rollbacks due to ITS `compile()` call failing), then we'll merge its
      * compiler state with our own so that we preserve important state details.
      *
-     * @param string $className
+     * @param string $className The full path of the class to sub-compile, but
+     *                          without any leading `\` global prefix. To save
+     *                          time, we assume the caller has already verified
+     *                          that it is a valid `LazyJsonMapper` class.
      *
      * @throws BadPropertyDefinitionException
      * @throws BadPropertyMapException

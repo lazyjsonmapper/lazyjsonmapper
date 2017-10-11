@@ -25,7 +25,7 @@ use ReflectionException;
 /**
  * Describes the behavior of a LazyJsonMapper property.
  *
- * NOTE: The class validates all parameters, but provides public properties to
+ * `NOTE:` The class validates all parameters, but provides public properties to
  * avoid needless function calls. It's therefore your responsibility to never
  * assign any bad values to the public properties after this object's creation!
  *
@@ -39,10 +39,11 @@ class PropertyDefinition
      * Array-depth until we reach the typed values.
      *
      * Examples:
-     *  0 = The property directly refers to an instance of "type".
-     *  1 = The property is an array of ["type","type"].
-     *  2 = The property is an array of arrays of [["type","type"],["type"]].
-     *  ...
+     *
+     * - `0` = Property directly refers to an instance of `"type"`.
+     * - `1` = Property is an array of `["type","type"]`.
+     * - `2` = Property is an array of arrays of `[["type","type"],["type"]]`.
+     * - and so on...
      *
      * @var int
      */
@@ -51,19 +52,19 @@ class PropertyDefinition
     /**
      * Assigned value-type for the property.
      *
-     * In case of basic PHP types, it is a string value such as "int".
+     * In case of basic PHP types, it is a string value such as `int`.
      *
-     * It uses NULL to represent "mixed" or "" (mixed shorthand) to make it easy
-     * and fast to check for untyped properties via a "=== null" comparison.
+     * It uses `NULL` to represent `mixed` or `""` (mixed shorthand) to make it
+     * easy & fast to check for untyped properties via a `=== null` comparison.
      *
-     * In case of classes, this is the normalized namespace+class path, but
-     * WITHOUT any initial leading "look from the global namespace" backslash.
-     * That's PHP's preferred notation for class paths in all of its various
-     * "get name" functions. However, that's very unsafe for actual object
-     * creation, since PHP would first try resolving to a relative object.
-     * Therefore, use getStrictClassPath() for actual creation or strict
-     * comparisons where any kind of namespace resolution will be involved,
-     * such as "is_a()" or "is_subclass_of()", etc!
+     * In case of classes, this is the normalized `NameSpace\Class` path, but
+     * WITHOUT any initial leading `\` ("look from the global namespace")
+     * backslash. That's PHP's preferred notation for class paths in all of its
+     * various "get name" functions. However, that's very unsafe for actual
+     * object creation, since PHP would first try resolving to a relative
+     * object. Therefore, use `getStrictClassPath()` for actual creation and
+     * for all strict comparisons where any kind of namespace resolution will
+     * be involved, in functions such as `is_a()` or `is_subclass_of()`, etc!
      *
      * @var string|null
      *
@@ -74,8 +75,9 @@ class PropertyDefinition
     /**
      * Whether the type is a class object or a built-in type.
      *
-     * Tip: If this value is true you can always trust $propType to be a string
-     * representing the normalized namespace+class path to the target class.
+     * Tip: If this value is `TRUE` then you can always trust `$propType` to be
+     * a string representing the normalized `NameSpace\Class` path to the target
+     * class.
      *
      * @var bool
      */
@@ -84,10 +86,10 @@ class PropertyDefinition
     /**
      * List of valid basic PHP types.
      *
-     * NOTE: We don't include "array", "object" or "null". Because we handle
-     * arrays separately (via arrayDepth), we handle objects via isObjectType,
-     * and we never want to explicitly cast anything to NULL. We also avoid the
-     * alternative names for some types, favoring their shortest names.
+     * `NOTE:` We don't include `array`, `object` or `null`. Because we handle
+     * arrays separately (via `$arrayDepth`), and objects via `$isObjectType`,
+     * and we never want to explicitly cast anything to `NULL`. We also avoid
+     * PHP's alternative names for some types, favoring their shortest names.
      *
      * @see http://php.net/settype
      *
@@ -98,19 +100,22 @@ class PropertyDefinition
     /**
      * Constructor.
      *
-     * @param string|null $definitionStr A PHPdoc-style string describing the property,
-     *                                   or NULL to create a default "untyped" property.
-     *                                   Note that if the type is set to the exact
-     *                                   keyword "LazyJsonMapper", we will select
-     *                                   the core class path without you needing
-     *                                   to write the full "\LazyJsonMapper\..."
-     *                                   path yourself. This works with "array of"
-     *                                   "LazyJsonMapper[][]" syntax too.
+     * @param string|null $definitionStr A PHPdoc-style string describing the
+     *                                   property, or `NULL` to create a default
+     *                                   "untyped" property. Note that if the
+     *                                   type is set to the exact keyword
+     *                                   `LazyJsonMapper`, we will select the
+     *                                   core class path without you needing to
+     *                                   write the full, global
+     *                                   `\LazyJsonMapper\LazyJsonMapper` path
+     *                                   yourself. This shortcut also works with
+     *                                   "array of" `LazyJsonMapper[][]` syntax.
      * @param string|null $baseNamespace Namespace to use for resolving relative
-     *                                   class paths. It CANNOT start or end with
-     *                                   a backslash. (Use __NAMESPACE__ format).
-     *                                   If no namespace is provided, all classes
-     *                                   are assumed to be relative to global.
+     *                                   class paths. It CANNOT start or end
+     *                                   with a backslash. (Use `__NAMESPACE__`
+     *                                   format). If no namespace is provided,
+     *                                   all classes are assumed to be relative
+     *                                   to the global namespace (`\`).
      *
      * @throws BadPropertyDefinitionException If the provided definition is invalid.
      */
@@ -224,7 +229,7 @@ class PropertyDefinition
             // First clean up the case-insensitive class name to become the
             // EXACT name for the class. So we can trust "propType" in ===.
             // Example: "\fOO\bAr" to "Foo\Bar". (Without any leading "\".)
-            // NOTE: getName() gets the namespace+class without leading "\",
+            // NOTE: getName() gets the "NameSpace\Class" without leading "\",
             // which is PHP's preferred notation. And that is exactly how we
             // will store the final path internally, so that we can always
             // trust comparisons of these typenames vs full paths to other
@@ -266,10 +271,10 @@ class PropertyDefinition
      *
      * Always use this function when creating objects or in any other way using
      * the "property type" class path as argument for PHP's class checking
-     * functions. The strict path that it returns ensures that PHP will find
+     * functions. The strict path that it provides ensures that PHP will find
      * the global path instead of resolving to a local object.
      *
-     * @return string|null Strict path if this is an object, otherwise NULL.
+     * @return string|null Strict path if this is an object, otherwise `NULL`.
      */
     public function getStrictClassPath()
     {
@@ -277,11 +282,11 @@ class PropertyDefinition
     }
 
     /**
-     * Check if all values of this property matches another property object.
+     * Check if all values of this property match another property object.
      *
      * @param PropertyDefinition $otherObject The object to compare with.
      *
-     * @return bool
+     * @return bool `TRUE` if all property values are identical, otherwise `FALSE`.
      */
     public function equals(
         PropertyDefinition $otherObject)

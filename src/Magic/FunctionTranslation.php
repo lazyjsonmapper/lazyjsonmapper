@@ -22,34 +22,38 @@ use LazyJsonMapper\Exception\MagicTranslationException;
 /**
  * Automatically translates a FunctionCase name into equivalent property names.
  *
- * The function names will be calculated into both "snake_case" and "camelCase"
+ * The function names will be calculated into both `snake_case` and `camelCase`
  * style properties, so that you can then look for their existence.
  *
  * ---------------------------------------------------------------------
- * WARNING:
+ *
+ * `WARNING:`
  * We do NOT support property names in "HumpBack" notation. It's intentional,
  * since HumpBack style is extremely rare and we save processing by not
- * supporting it. See PropertyTranslation's class docs for more information.
+ * supporting it. See `PropertyTranslation`'s class docs for more information.
+ *
  * ---------------------------------------------------------------------
  *
  * Translation Examples (INPUT LISTED FIRST, then its output as snake & camel):
  *
- * - "__Foo_Bar__XBaz__" => "__foo__bar___x_baz__" (snake)
- *                          "__foo_Bar__XBaz__" (camel)
- * - "0m__AnUn0x"        => "0m___an_un0x" (snake) & "0m__AnUn0x" (camel)
- * - "Some0XThing"       => "some0_x_thing" (snake) & "some0XThing" (camel)
- * - "Some0xThing"       => "some0x_thing" (snake) & "some0xThing" (camel)
- * - "SomeThing"         => "some_thing" (snake) & "someThing" (camel)
- * - "Something"         => "something" (snake) & NULL (camel)
- * - "___"               => "___" (snake) & NULL (camel)
- * - "_0"                => "_0" (snake) & NULL (camel)
- * - "_Messages"         => "_messages" (snake) & NULL (camel)
- * - "__MessageList"     => "__message_list" (snake) & "__messageList" (camel)
- * - "123"               => "123" (snake) & NULL (camel)
- * - "123prop"           => "123prop" (snake) & NULL (camel)
- * - "123Prop"           => "123_prop" (snake) & "123Prop" (camel)
+ * - `__Foo_Bar__XBaz__` => `__foo__bar___x_baz__` (snake)
+ *                          `__foo_Bar__XBaz__` (camel)
+ * - `0m__AnUn0x`        => `0m___an_un0x` (snake) & `0m__AnUn0x` (camel)
+ * - `Some0XThing`       => `some0_x_thing` (snake) & `some0XThing` (camel)
+ * - `Some0xThing`       => `some0x_thing` (snake) & `some0xThing` (camel)
+ * - `SomeThing`         => `some_thing` (snake) & `someThing` (camel)
+ * - `Something`         => `something` (snake) & `NULL` (camel)
+ * - `___`               => `___` (snake) & `NULL` (camel)
+ * - `_0`                => `_0` (snake) & `NULL` (camel)
+ * - `_Messages`         => `_messages` (snake) & `NULL` (camel)
+ * - `__MessageList`     => `__message_list` (snake) & `__messageList` (camel)
+ * - `123`               => `123` (snake) & `NULL` (camel)
+ * - `123prop`           => `123prop` (snake) & `NULL` (camel)
+ * - `123Prop`           => `123_prop` (snake) & `123Prop` (camel)
  *
- * NOTE: The class validates all parameters, but provides public properties to
+ * ---------------------------------------------------------------------
+ *
+ * `NOTE:` The class validates all parameters, but provides public properties to
  * avoid needless function calls. It's therefore your responsibility to never
  * assign any bad values to the public properties after this object's creation!
  *
@@ -64,7 +68,7 @@ class FunctionTranslation
     /**
      * The property name in underscore "snake_case" style.
      *
-     * For example "some_example_property".
+     * For example `some_example_property`.
      *
      * @var string
      */
@@ -73,9 +77,9 @@ class FunctionTranslation
     /**
      * The property name in "camelCase" style.
      *
-     * For example "someExampleProperty".
+     * For example `someExampleProperty`.
      *
-     * NOTE: This is NULL if the property consists only of a single word.
+     * `NOTE:` This is `NULL` if the property consists only of a single word.
      *
      * @var string|null
      */
@@ -86,9 +90,9 @@ class FunctionTranslation
      *
      * @param string $funcCase The "property" portion of the function name to
      *                         translate, in "FunctionCase" style, such as
-     *                         "SomeExampleProperty".
+     *                         `SomeExampleProperty`.
      *
-     * @throws MagicTranslationException If the FuncCase name is unparseable.
+     * @throws MagicTranslationException If the `$funcCase` name is unparseable.
      *
      * @see FunctionTranslation::splitFunctionName() For a helper to split your
      *                                               function names into the
@@ -119,35 +123,37 @@ class FunctionTranslation
      * Split a function name into its function-type and FuncCase components.
      *
      * This helper function takes care of splitting a full function name, such
-     * as "getSomeVariable", into "get" (its function type) and "SomeVariable"
+     * as `getSomeVariable`, into `get` (its function type) and `SomeVariable`
      * (the valid input format for the FunctionTranslation constructor).
      *
-     * Call it from your own code before constructing your FunctionTranslation
+     * Call it from your own code before constructing your `FunctionTranslation`
      * objects. Don't worry about the extra function call for this splitter.
      * It can perform its job 2.5 million times per second on a 2010 Core i7
      * dual-core laptop on PHP7, and 0.64 million times per second on PHP5.
      * And directly embedding these same steps instead of calling this function
-     * will gain 5% more speed in PHP7 and 16% more speed in PHP5. But the
+     * will only gain 5% more speed in PHP7 and 16% more speed in PHP5. But the
      * numbers are already so astronomically fast that it doesn't matter!
      *
-     * This splitting into "get" and "SomeVariable" is easy and super efficient.
-     * It is this class' final translation of the FunctionCase "SomeVariable"
-     * part into "some_variable" and "someVariable" properties that's the HARD
+     * This splitting into `get` and `SomeVariable` is easy and super efficient.
+     * It is this class' final translation of the FunctionCase `SomeVariable`
+     * part into `some_variable` and `someVariable` properties that's the HARD
      * step which should be cached.
      *
      * Recommended usage:
      *
+     *  ```php
      *  list($functionType, $funcCase) = FunctionTranslation::splitFunctionName($name);
      *  // if $functionType is now NULL, the input was invalid. otherwise it was ok.
+     *  ```
      *
      * @param string $functionName The function name to split. It's your job to
      *                             make sure this is a string-type variable! We
      *                             will not validate its type. Empty strings ok.
      *
-     * @return string[]|null[] Two-element array of "type" (element 0) and
-     *                         "FuncCase" (element 1). If the input name wasn't
-     *                         valid "doSomething" function-camelCase, then both
-     *                         elements are NULL values instead of strings.
+     * @return string[]|null[] Two-element array of `functionType` (element 0) &
+     *                         `funcCase` (element 1). If the input name wasn't
+     *                         valid a `doSomething` (function-camelCase), then
+     *                         both elements are `NULL` instead of strings.
      */
     public static function splitFunctionName(
         $functionName)
@@ -199,7 +205,8 @@ class FunctionTranslation
      *
      * @param string $funcCase
      *
-     * @return array|bool Array with snake&camel if successful, otherwise FALSE.
+     * @return array|bool Associative array with `snake` & `camel` elements if
+     *                    successful, otherwise `FALSE`.
      */
     protected function _funcCaseToProperties(
         $funcCase)

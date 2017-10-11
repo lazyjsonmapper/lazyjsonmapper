@@ -58,13 +58,13 @@ class UndefinedProperty extends PropertyDefinition
      * property" object instance can be shared across all code, without needing
      * to allocate individual memory for any more instances of this class.
      *
-     * WARNING: Because this class is optimized for LazyJsonMapper performance
-     * (avoiding function call/stack overhead by having public properties), it's
-     * extremely important that you do not modify ANY of the properties of this
-     * object instance when you get it, or you'll break EVERY shared copy! You
-     * are not supposed to manually edit any public property on this class
-     * anyway, as the PropertyDefinition class description explains, but it's
-     * even more important in this situation.
+     * `WARNING:` Because this class is optimized for `LazyJsonMapper`
+     * performance (avoiding function call/stack overhead by having public
+     * properties), it's extremely important that you do not modify ANY of the
+     * properties of this object instance when you get it, otherwise you'll
+     * break EVERY shared copy! You are not supposed to manually edit any public
+     * property on this class anyway, as the main `PropertyDefinition` class
+     * description explains, but it's even more important in this situation.
      *
      * @return UndefinedProperty
      */

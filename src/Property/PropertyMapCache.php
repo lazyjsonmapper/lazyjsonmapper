@@ -42,15 +42,15 @@ class PropertyMapCache
      *
      * This is used internally for detecting circular references in "import
      * class" instructions during property map compilation. For example, if
-     * "A extends LazyJsonMapper, imports B" and "B extends LazyJsonMapper,
-     * imports A", then the compilation of either class will fail gracefully
+     * `A extends LazyJsonMapper, imports B` and `B extends LazyJsonMapper,
+     * imports A`, then the compilation of either class will fail gracefully
      * instead of attempting to recursively allocate infinite memory and dying.
      *
-     * For example, compiling "A" would mark A as an "unresolved (locked)
-     * class", and then we'd encounter its instruction to "import B", and
-     * then we'll attempt to resolve B. Then, "B" encounters its instruction
-     * to "import A" and sees that it's a locked class and understands that
-     * "A" is currently being compiled which means that we've detected
+     * For example, compiling `A` would mark `A` as an "unresolved (locked)
+     * class", and then we'd encounter its instruction to `import B`, and
+     * then we'll attempt to resolve `B`. Then, `B` encounters its instruction
+     * to `import A` and sees that it's a locked class and understands that
+     * `A` is currently being compiled which means that we've detected
      * a circular import reference. At that point, we'll throw an exception.
      *
      * @var array

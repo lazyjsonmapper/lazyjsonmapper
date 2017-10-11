@@ -91,7 +91,7 @@ use stdClass;
  *      public function setFoo(
  *          $value)
  *      {
- *          // if they try to set value to "md5", we use a special value instead
+ *          // if they try to set value to "md5", use a special value instead.
  *          if ($value === 'md5') { $value = md5(time()); }
  *          return $this->_setProperty('foo', $value);
  *      }
@@ -202,9 +202,9 @@ class LazyJsonMapper implements Serializable
      * This constant can be overridden in your subclasses to toggle the option.
      *
      * It is recommended that all of your brand new projects create a subclass
-     * of LazyJsonMapper which disables this option, and then you simply derive
-     * all of your other classes from that subclass so that nothing in your
-     * project has direct virtual property access enabled.
+     * of `LazyJsonMapper` which disables this option, and then you simply
+     * derive all of your other classes from that subclass so that nothing in
+     * your project has direct virtual property access enabled.
      *
      * That's because there are many quirks with how PHP implements virtual
      * properties, which can lead to performance slowdowns and lack of data
@@ -306,7 +306,7 @@ class LazyJsonMapper implements Serializable
      *   }
      *   ```
      *
-     * With the above code, MyUncachedLazyJsonMapper (and anything which extends
+     * With the above code, `MyUncachedLazyJsonMapper` (and anything extending
      * from it) would run without using the magic function translation cache,
      * which means that all magic "virtual function" calls on instances of that
      * class would have to redo their property translations every time.
@@ -344,7 +344,7 @@ class LazyJsonMapper implements Serializable
      * current object instance's internal JSON data.
      *
      * You can also map values to objects. In the case of objects (classes), the
-     * classes MUST inherit from LazyJsonMapper so they support all necessary
+     * classes MUST inherit from `LazyJsonMapper` so they support all necessary
      * mapping features. To assign a class to a property, you can either write a
      * FULL (global) class path starting with a leading backslash `\`, such as
      * `\Foo\Bar\Baz`. Alternatively, you can use a RELATIVE path related to the
@@ -371,7 +371,7 @@ class LazyJsonMapper implements Serializable
      * of 2 arrays, and that no further arrays are allowed deeper than that.)
      *
      * The assigned types and array-depths are STRICTLY validated. That's an
-     * integral part of the LazyJsonMapper container, since it ensures that your
+     * integral part of the `LazyJsonMapper` container, since it guarantees your
      * class property map interface will be strictly followed, and that you can
      * fully TRUST the data you're interacting with. If your map says that the
      * array data is at depth 8 and consists of `YourObject` objects, then we'll
@@ -516,7 +516,7 @@ class LazyJsonMapper implements Serializable
     /**
      * Magic virtual function lookup cache.
      *
-     * Globally shared across all instances of LazyJsonMapper classes. That
+     * Globally shared across all instances of `LazyJsonMapper` classes. That
      * saves tons of memory, since multiple different components/libraries in
      * your project can use any functions they need, such as `getComments()`,
      * and then all OTHER code that uses a `comments` property would share that
@@ -552,7 +552,7 @@ class LazyJsonMapper implements Serializable
      * It compiles the maps the first time the class is used, and then it just
      * stays in memory for instant re-use. So again, don't worry about it! :-)
      *
-     * Globally shared across all instances of LazyJsonMapper classes. Which
+     * Globally shared across all instances of `LazyJsonMapper` classes. Which
      * ensures that classes are truly only compiled ONCE during PHP's runtime,
      * even when multiple parts of your project or other libraries use the same
      * classes. And it also means that there's no need for you to manually
@@ -788,7 +788,7 @@ class LazyJsonMapper implements Serializable
      * replace the object's data. (When new data is assigned, you should treat
      * yourself as a new object, which is why `_init()` will run again.)
      *
-     * WARNING: Please RESIST the urge to touch ANY of the internal JSON data
+     * `WARNING:` Please RESIST the urge to touch ANY of the internal JSON data
      * during this initialization. All data will always be automatically
      * validated during actual retrieval and setting, so you can always trust
      * that the final types WILL match your class property map definitions.
@@ -820,7 +820,7 @@ class LazyJsonMapper implements Serializable
      *  Also remember that you may not even need `_init()`, since you can simply
      *  give your properties default values instead of using `_init()`, such as
      *  by writing `public $myproperty = true;`. All instances of that object
-     *  would then start with that value set to `true` by default.
+     *  would then start with that value set to `TRUE` by default.
      *
      *  2. You can ONLY throw `LazyUserException`. All other exceptions will be
      *  blocked and turned into a generic `LazyUserException`. This is done to
@@ -905,7 +905,7 @@ class LazyJsonMapper implements Serializable
      * preferable in other, more general "runtime usage" since it is totally
      * clear about exactly which final object each class path refers to.
      *
-     * @param bool $allowRelativeTypes If TRUE, object types will use relative
+     * @param bool $allowRelativeTypes If `TRUE`, object types will use relative
      *                                 paths (compared to this class) whenever
      *                                 possible.
      * @param bool $includeUndefined   Whether to also include properties that
@@ -976,7 +976,7 @@ class LazyJsonMapper implements Serializable
      *                                 each property. Which is very helpful, but
      *                                 also very long. So you may want to
      *                                 disable this option.
-     * @param bool $allowRelativeTypes If TRUE, object types will use relative
+     * @param bool $allowRelativeTypes If `TRUE`, object types will use relative
      *                                 paths (compared to this class) whenever
      *                                 possible.
      * @param bool $includeUndefined   Whether to also include properties that
@@ -1094,7 +1094,7 @@ class LazyJsonMapper implements Serializable
      * It also means the returned copy belongs to YOU, and that you're able to
      * do ANYTHING with it, without risk of affecting any of OUR internal data.
      *
-     * WARNING: If you intend to use the result to `json_encode()` a new JSON
+     * `WARNING:` If you intend to use the result to `json_encode()` a new JSON
      * object then please DON'T do that. Look at `asJson()` instead, which gives
      * you full control over all JSON output parameters and properly handles the
      * conversion in all scenarios, without you needing to do any manual work.
@@ -1285,8 +1285,8 @@ class LazyJsonMapper implements Serializable
      * Note that we only encode properties that exist in the actual internal
      * data. Anything that merely exists in the class property map is omitted.
      *
-     * WARNING: It is worth saving the output of this function if you intend to
-     * use the result multiple times, since each call to this function will
+     * `WARNING:` It is worth saving the output of this function if you intend
+     * to use the result multiple times, since each call to this function will
      * internally use `exportObjectDataCopy()`, which performs quite intensive
      * work to recursively validate and convert values while creating the final
      * representation of the object's internal JSON data. Please read the
@@ -1294,7 +1294,7 @@ class LazyJsonMapper implements Serializable
      *
      * @param int $options Bitmask to control `json_encode()` behavior.
      * @param int $depth   Maximum JSON depth. Encoding fails if set too low.
-     *                     Can almost always safely be left at 512 (default).
+     *                     Can almost always safely be left at `512` (default).
      *
      * @throws LazyJsonMapperException If there are any conversion problems.
      *
@@ -1376,10 +1376,10 @@ class LazyJsonMapper implements Serializable
      * about how the internal JSON conversion process works.
      *
      * @param bool $prettyPrint Use whitespace to nicely format the data.
-     *                          Defaults to TRUE since we assume that you want
+     *                          Defaults to `TRUE` since we assume that you want
      *                          human readable output while debug-printing.
      * @param int  $depth       Maximum JSON depth. Encoding fails if set too
-     *                          low. Can almost always safely be left at 512
+     *                          low. Can almost always safely be left at `512`
      *                          (default).
      *
      * @throws LazyJsonMapperException If there are any conversion problems.
@@ -1403,7 +1403,7 @@ class LazyJsonMapper implements Serializable
      *
      * Internally runs `asJson()`.
      *
-     * WARNING: It is very dangerous to rely on the automatic string conversion,
+     * `WARNING:` It's **dangerous** to rely on the automatic string conversion,
      * since PHP doesn't allow this handler to throw any error/exceptions (if we
      * do, PHP would die with a Fatal Error). So we cannot notify about errors.
      *
@@ -1615,7 +1615,7 @@ class LazyJsonMapper implements Serializable
      *
      * These are properties defined in the JSON property map for the class.
      *
-     * NOTE: This is the STRICTEST function, which checks if a property is
+     * `NOTE:` This is the STRICTEST function, which checks if a property is
      * defined in the class. It rejects properties that only exist in the data.
      *
      * @param string $propName The property name.
@@ -1634,7 +1634,7 @@ class LazyJsonMapper implements Serializable
      * These are properties that are either defined in the JSON property map
      * for the class OR that exist in the object instance's data.
      *
-     * NOTE: This is the RECOMMENDED function for checking if a property is
+     * `NOTE:` This is the RECOMMENDED function for checking if a property is
      * valid, since properties ARE VALID if they exist in the class definition
      * OR in the object instance's data.
      *
@@ -1654,7 +1654,7 @@ class LazyJsonMapper implements Serializable
      *
      * These are properties that currently exist in the object instance's data.
      *
-     * NOTE: This function ISN'T RECOMMENDED unless you know what you're doing.
+     * `NOTE:` This function ISN'T RECOMMENDED unless you know what you're doing.
      * Because any property that exists in the class definition is valid as
      * well, and can be retrieved even if it isn't in the current object data.
      * So `_hasPropertyDefinitionOrData()` is recommended instead, if your goal
@@ -1727,7 +1727,7 @@ class LazyJsonMapper implements Serializable
      * the value to the correct type on-the-fly. If that part of the data-array
      * is an object, it will be lazy-created the first time it's requested.
      *
-     * NOTE: If the object instance's internal data doesn't contain a value, but
+     * `NOTE:` If the object instance's internal data doesn't contain a value, but
      * it's listed in the class property definition, then it will be treated as
      * missing and `NULL` will automatically be returned instead. However, if
      * it's missing from the class definition AND the object instance's data,
@@ -1739,15 +1739,16 @@ class LazyJsonMapper implements Serializable
      * value. However, if that distinction matters to you, you should simply
      * call `_hasPropertyData()` before retrieving the value.
      *
-     * IMPORTANT: This function performs return-by-reference, which was done in
-     * order to allow certain ADVANCED programming tricks by the caller. If you
-     * save our return value by reference, you'll then have a direct link to the
-     * internal data for that property and can write directly to it (including
-     * writing invalid data if you want to, since we cannot verify what you do
-     * with your reference). However, you A) don't have to worry about invalid
-     * data, because it will all get validated at the next `_getProperty()` call
-     * again, and B) you have to explicitly bind the returned value by reference
-     * to actually risk affecting the internal data, as explained below.
+     * `IMPORTANT:` This function performs return-by-reference, which was done
+     * in order to allow certain ADVANCED programming tricks by the caller. If
+     * you save our return value by reference, you'll then have a direct link to
+     * the internal data for that property and can write directly to it
+     * (including writing invalid data if you want to, since we cannot verify
+     * what you do with your reference). However, you A) don't have to worry
+     * about invalid data, because it will all get validated at the next
+     * `_getProperty()` call again, and B) you have to explicitly bind the
+     * returned value by reference to actually risk affecting the internal
+     * data, as explained below.
      *
      * Method 1 (recommended for almost 100% of all usages, safest):
      *
@@ -1763,7 +1764,7 @@ class LazyJsonMapper implements Serializable
      *  $val = 'bar'; // Direct link, thus modifies the internal "foo" property.
      *  ```
      *
-     * SERIOUS WARNING: If you use Method 2, do NOT use the code above. It was
+     * `SERIOUS WARNING:` If you use Method 2, do NOT use the code above. It was
      * just explained that way to demonstrate a SERIOUS MISTAKE. If you assign
      * by reference, you obviously intend to link directly to internal data. But
      * the code above fails if no internal data for that property exists yet. In
@@ -1811,14 +1812,14 @@ class LazyJsonMapper implements Serializable
      *  ```
      *
      * @param string $propName           The property name.
-     * @param bool   $createMissingValue If TRUE we will create missing internal
-     *                                   object data entries (for class-defined
-     *                                   properties) and store a `NULL` in them.
-     *                                   This will "pollute" the internal data
-     *                                   with default `NULL`s for every missing
-     *                                   property that you attempt to retrieve,
-     *                                   but it's totally NECESSARY if you
-     *                                   intend to use the return-value
+     * @param bool   $createMissingValue If `TRUE` then we will create missing
+     *                                   internal object data entries (for
+     *                                   class-defined properties) and store a
+     *                                   `NULL` in them. This will "pollute" the
+     *                                   internal data with default `NULL`s for
+     *                                   every missing property that you attempt
+     *                                   to retrieve, but it's totally NECESSARY
+     *                                   if you intend to use the return-value
      *                                   by-reference, since we MUST store the
      *                                   value internally when you want the
      *                                   returned reference to link to our
@@ -1889,7 +1890,7 @@ class LazyJsonMapper implements Serializable
     }
 
     /**
-     * Check if an object data property exists and its value evaluates to true.
+     * Check if an object data property exists and its value evaluates to TRUE.
      *
      * @param string $propName The property name.
      *
@@ -1970,22 +1971,23 @@ class LazyJsonMapper implements Serializable
      * This magic handler auto-maps "virtual function" has-ers, is-ers, getters,
      * setters and unsetters for all of the object's JSON data properties.
      *
-     * ```
-     * hasX()   = "x" exists in the class definition and/or the object instance
-     *            data. (The hasX()-functions are the only ones that never throw
-     *            even if the property is invalid.) This function is totally
-     *            useless if you've defined the property in the class map, and
-     *            will always return TRUE in that case. Its ONLY purpose is to
-     *            allow you to look for UNDEFINED properties that may/may not
-     *            exist in the current data, before you decide to call any of
-     *            the other "throwy" functions on that property. In other words,
-     *            it's used for working with UNMAPPED (undefined) properties!
-     * isX()    = "x" exists in the object instance's data & evaluates to TRUE.
-     * getX()   = Retrieve the value of "x". Uses copy-on-write (not reference).
-     * setX($v) = Set the value of "x" to "$v". The setters can be chained.
-     * unsetX() = Erase the internal value from the object instance's data.
-     *            The unsetters can be chained.
-     * ```
+     * - `bool hasX()` checks if "x" exists in the class definition and/or the
+     *   object instance data. The `has`-functions are the only ones that never
+     *   throw even if the property is invalid. This function is totally useless
+     *   if you've defined the property in the class map, and will always return
+     *   `TRUE` in that case. Its ONLY purpose is to allow you to look for
+     *   UNDEFINED properties that may/may not exist in the current data, before
+     *   you decide to call any of the other "throwy" functions on that
+     *   property. In other words, it's used for working with UNMAPPED
+     *   (undefined) properties!
+     * - `bool isX()` checks if "x" exists in the object instance's data and its
+     *   current value evaluates to `TRUE`.
+     * - `mixed getX()` retrieves the value of "x". Uses copy-on-write (not a
+     *   reference).
+     * - `$this setX(mixed $value)` sets the value of "x" to `$value`. The
+     *   setters can be chained.
+     * - `$this unsetX()` erases the internal value from the object instance's
+     *   data. The unsetters can be chained.
      *
      * @param string $functionName Name of the function being called.
      * @param array  $arguments    Array of arguments passed to the function.
@@ -2124,7 +2126,7 @@ class LazyJsonMapper implements Serializable
      * This magic handler takes care of "virtual property" access to the
      * object's JSON data properties.
      *
-     * WARNING: Note that the `__get()` "virtual property" handling will create
+     * `WARNING:` Note that the `__get()` "virtual property" handling creates
      * `NULL` values in any missing (but valid in class-map) properties that you
      * try to access! That is NECESSARY because PHP EXPECTS the `__get()` return
      * value to be a REFERENCE to real internal data, so we MUST create a value
@@ -2300,14 +2302,14 @@ class LazyJsonMapper implements Serializable
     /**
      * __ISSET is invoked by calling isset() or empty() on inaccessible properties.
      *
-     * NOTE: When the user calls `empty()`, PHP first calls `__isset()`, and if
+     * `NOTE:` When the user calls `empty()`, PHP first calls `__isset()`, and if
      * that's true it calls `__get()` and ensures the value is really non-empty.
      *
      * @param string $propName The property name.
      *
      * @throws LazyUserOptionException If virtual properties are disabled.
      *
-     * @return bool TRUE if the property exists in the object instance's data
+     * @return bool `TRUE` if the property exists in the object instance's data
      *              and is non-`NULL`.
      */
     final public function __isset(

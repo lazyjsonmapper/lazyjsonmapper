@@ -34,20 +34,32 @@ use LazyJsonMapper\Utilities;
  */
 class LazyUserOptionException extends LazyUserException
 {
-    /** @var int */
+    /**
+     * The default error message.
+     *
+     * @var int
+     */
     const ERR_DEFAULT = 0;
 
-    /** @var int */
+    /**
+     * The error message about virtual properties being disabled.
+     *
+     * @var int
+     */
     const ERR_VIRTUAL_PROPERTIES_DISABLED = 1;
 
-    /** @var int */
+    /**
+     * The error message about virtual functions being disabled.
+     *
+     * @var int
+     */
     const ERR_VIRTUAL_FUNCTIONS_DISABLED = 2;
 
     /**
      * Constructor.
      *
-     * @param LazyJsonMapper $owner
-     * @param int            $errorCode
+     * @param LazyJsonMapper $owner     Class instance that triggered the error.
+     * @param int            $errorCode Which error message to display.
      */
     public function __construct(
         LazyJsonMapper $owner,

@@ -17,14 +17,16 @@
 
 namespace LazyJsonMapper\Exception;
 
+use LazyJsonMapper\LazyJsonMapper;
+
 /**
  * Describes that an error happened in user-written subclass code or options.
  *
- * This exception is never purposefully thrown by the core LazyJsonMapper
+ * This exception is never purposefully thrown by the core `LazyJsonMapper`
  * class by default. It's only thrown if problems happen in subclass code or
  * if there are problems related to the user-class options.
  *
- * Currently, that's only possible in the LazyJsonMapper::_init() function,
+ * Currently, that's only possible in the `LazyJsonMapper::_init()` function,
  * or when the user has overridden certain user-class options away from
  * the default values and then attempts to perform an action affected by
  * their non-standard class option.
@@ -32,6 +34,8 @@ namespace LazyJsonMapper\Exception;
  * @copyright 2017 The LazyJsonMapper Project
  * @license http://www.apache.org/licenses/LICENSE-2.0
  * @author SteveJobzniak (https://github.com/SteveJobzniak)
+ *
+ * @see LazyJsonMapper::_init()
  */
 class LazyUserException extends LazyJsonMapperException
 {

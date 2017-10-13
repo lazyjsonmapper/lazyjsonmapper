@@ -72,6 +72,11 @@ use stdClass;
  *
  *    The virtual functions can be disabled via an option.
  *
+ *  - Includes the `LazyDoctor` tool, which _automatically_ documents all of
+ *    your `LazyJsonMapper`-based classes so that their virtual properties and
+ *    functions become _fully_ visible to your IDE and to various intelligent
+ *    code analysis tools.
+ *
  *  - We provide a complete, internal API which your subclasses can use to
  *    interact with the data inside of the JSON container. This allows you to
  *    easily override the automatic functions or create additional functions
@@ -441,7 +446,7 @@ class LazyJsonMapper implements Serializable
      * `my_own_prop`. Then it imports everything from `OtherClass` (and its
      * parents/imports). Then it adds/overwrites `redefined_prop` (useful if you
      * want to re-define some property that was inherited from the other class).
-     * And lastly, it imports everything from `\OtherNameSpace\Something` (and
+     * And lastly, it imports everything from `\OtherNamespace\SomeClass` (and
      * its parents/imports). As long as there are no circular references,
      * everything will compile successfully and you will end up with a very
      * advanced final map! And any other class which later inherits from

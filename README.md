@@ -38,6 +38,11 @@ without having to worry about doing any of the tedious parsing yourself.
 
   The virtual functions can be disabled via an option.
 
+- Includes the `LazyDoctor` tool, which _automatically_ documents all of
+  your `LazyJsonMapper`-based classes so that their virtual properties and
+  functions become _fully_ visible to your IDE and to various intelligent
+  code analysis tools.
+
 - We provide a complete, internal API which your subclasses can use to
   interact with the data inside of the JSON container. This allows you to
   easily override the automatic functions or create additional functions
@@ -175,6 +180,13 @@ View the contents of the [`examples/`](https://github.com/SteveJobzniak/LazyJson
 Everything is fully documented directly within the source code of this library.
 
 You can also [read the same documentation online](https://stevejobzniak.github.io/lazyjsonmapper-docs/namespaces/LazyJsonMapper.html) as nicely formatted HTML pages.
+
+### LazyDoctor
+
+Our automatic class-documentation utility will be placed within your project's
+`./vendor/bin/` folder. Simply run it without any parameters to see a list of
+all available options. You can also open that file in a regular text editor to
+read some general usage tips and tricks at the top of the utility's source code.
 
 ### Copyright
 

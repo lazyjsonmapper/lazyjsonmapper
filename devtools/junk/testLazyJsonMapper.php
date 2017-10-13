@@ -1297,8 +1297,9 @@ var_dump('---------------------');
 
 // Test the property description system (the parameters are so strict that there
 // isn't really anything to test, apart from the relative property param...)
+$ownerClassName = get_class(new Test());
 $desc = new PropertyDescription(
-    new Test(),
+    $ownerClassName,
     'the_property',
     new PropertyDefinition('\Foo\Test[][]'),
     false // do not allow relative paths
@@ -1306,7 +1307,7 @@ $desc = new PropertyDescription(
 var_dump($desc);
 
 $desc = new PropertyDescription(
-    new Test(),
+    $ownerClassName,
     'the_property',
     new PropertyDefinition('\Foo\Test[][]'),
     true // allow relative paths
@@ -1316,7 +1317,7 @@ var_dump($desc);
 // and now test the is_defined detection of UndefinedProperty:
 
 $desc = new PropertyDescription(
-    new Test(),
+    $ownerClassName,
     'the_property',
     \LazyJsonMapper\Property\UndefinedProperty::getInstance(),
     false // do not allow relative paths
@@ -1324,7 +1325,7 @@ $desc = new PropertyDescription(
 var_dump($desc);
 
 $desc = new PropertyDescription(
-    new Test(),
+    $ownerClassName,
     'the_property',
     \LazyJsonMapper\Property\UndefinedProperty::getInstance(),
     true // allow relative paths

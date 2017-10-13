@@ -932,9 +932,10 @@ class LazyJsonMapper implements Serializable
 
         // First include all of the defined properties for the current class.
         $descriptions = [];
+        $ownerClassName = get_class($this);
         foreach ($this->_compiledPropertyMapLink as $propName => $propDef) {
             $descriptions[$propName] = new PropertyDescription( // Throws.
-                $this,
+                $ownerClassName,
                 $propName,
                 $propDef,
                 $allowRelativeTypes
@@ -947,7 +948,7 @@ class LazyJsonMapper implements Serializable
             foreach ($this->_objectData as $propName => $v) {
                 if (!isset($descriptions[$propName])) {
                     $descriptions[$propName] = new PropertyDescription( // Throws.
-                        $this,
+                        $ownerClassName,
                         $propName,
                         $undefinedProperty,
                         $allowRelativeTypes

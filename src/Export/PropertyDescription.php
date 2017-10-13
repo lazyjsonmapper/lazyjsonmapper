@@ -168,8 +168,15 @@ class PropertyDescription
     /**
      * Constructor.
      *
-     * @param LazyJsonMapper     $ownerClass            Class instance which
-     *                                                  owns this property.
+     * @param string             $ownerClassName        The full path of the
+     *                                                  class that owns this
+     *                                                  property, but without
+     *                                                  any leading `\` global
+     *                                                  prefix. To save time, we
+     *                                                  assume the caller has
+     *                                                  already verified that it
+     *                                                  is a valid
+     *                                                  `LazyJsonMapper` class.
      * @param string             $propName              The JSON property name.
      * @param PropertyDefinition $propDef               Compiled definition of
      *                                                  the property.
@@ -185,11 +192,14 @@ class PropertyDescription
      * @throws LazyJsonMapperException If there are any problems with the input.
      */
     public function __construct(
-        LazyJsonMapper $ownerClass,
+        $ownerClassName,
         $propName,
         PropertyDefinition $propDef,
         $allowRelativeTypePath = false)
     {
+        if (!is_string($ownerClassName) || $ownerClassName === '') {
+            throw new LazyJsonMapperException('The owner class name must be a non-empty string value.');
+        }
         if (!is_string($propName) || $propName === '') {
             throw new LazyJsonMapperException('The property name must be a non-empty string value.');
         }
@@ -201,7 +211,7 @@ class PropertyDescription
         $isDefined = !($propDef instanceof UndefinedProperty);
 
         // Generate the strict, global path to the owning class.
-        $strictOwnerClassPath = Utilities::createStrictClassPath(get_class($ownerClass));
+        $strictOwnerClassPath = Utilities::createStrictClassPath($ownerClassName);
 
         // Determine the final type to use, in either absolute or relative form.
         $finalType = $propDef->asString();

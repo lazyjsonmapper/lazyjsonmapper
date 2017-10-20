@@ -1295,6 +1295,45 @@ foreach ($funcList as $f) {
 
 var_dump('---------------------');
 
+// test the special operator translator
+$result = 'A + and - and * and / and finally % symbol... And some ++--**//%% close ones...';
+var_dump($result);
+$result = \LazyJsonMapper\Magic\SpecialOperators::encodeOperators($result);
+var_dump($result);
+$result = \LazyJsonMapper\Magic\SpecialOperators::decodeOperators($result);
+var_dump($result);
+
+class OperatorTest extends LazyJsonMapper
+{
+    const JSON_PROPERTY_MAP = [
+        'en+US'                 => 'string',
+        'en-US'                 => 'string',
+        'en/US'                 => 'string',
+        'en%US'                 => 'string',
+        'en*US'                 => 'string',
+        'with;semicolon_and@at' => 'string',
+    ];
+}
+
+$optest = new OperatorTest([
+    'en+US'                 => 'plus',
+    'en-US'                 => 'minus',
+    'en/US'                 => 'divide',
+    'en%US'                 => 'modulo',
+    'en*US'                 => 'multiply',
+    'with;semicolon_and@at' => 'complex characters here!',
+]);
+
+$optest->printPropertyDescriptions();
+var_dump($optest->getEn_x2B_US()); // plus
+var_dump($optest->getEn_x2D_US()); // minus
+var_dump($optest->getEn_x2F_US()); // divide
+var_dump($optest->getEn_x25_US()); // modulo
+var_dump($optest->getEn_x2A_US()); // multiply
+var_dump($optest->getWith_x3B_semicolonAnd_x40_at());
+
+var_dump('---------------------');
+
 // Test the property description system (the parameters are so strict that there
 // isn't really anything to test, apart from the relative property param...)
 $ownerClassName = get_class(new Test());

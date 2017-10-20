@@ -25,7 +25,12 @@ use LazyJsonMapper\Exception\MagicTranslationException;
  * The translation into a function name will differ based on the style of
  * the property name that was sent in as a parameter. That's intentional.
  *
- * We support `snake_case` and `camelCase` property name styles.
+ * ---------------------------------------------------------------------
+ *
+ * `NOTE`: We support `snake_case` and `camelCase` property styles. We do NOT
+ * support any other styles or any `badly_mixed_Styles`. If you cannot simply
+ * rename your badly named properties to valid names, then you can still access
+ * them via the internal LazyJsonMapper API instead of this magic translation!
  *
  * ---------------------------------------------------------------------
  *
@@ -176,6 +181,10 @@ class PropertyTranslation
         if ($leadingUnderscores > 0) {
             $result = str_repeat('_', $leadingUnderscores).$result;
         }
+
+        // Lastly, we must now translate special PHP operators to an encoded
+        // representation, just in case their property name has illegal chars.
+        $result = SpecialOperators::encodeOperators($result);
 
         return $result;
     }

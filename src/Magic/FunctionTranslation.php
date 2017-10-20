@@ -27,9 +27,16 @@ use LazyJsonMapper\Exception\MagicTranslationException;
  *
  * ---------------------------------------------------------------------
  *
+ * `NOTE`: We support `snake_case` and `camelCase` property styles. We do NOT
+ * support any other styles or any `badly_mixed_Styles`. If you cannot simply
+ * rename your badly named properties to valid names, then you can still access
+ * them via the internal LazyJsonMapper API instead of this magic translation!
+ *
+ * ---------------------------------------------------------------------
+ *
  * `WARNING:`
  * We do NOT support property names in "HumpBack" notation. It's intentional,
- * since HumpBack style is extremely rare and we save processing by not
+ * since HumpBack style is extremely rare, and we save processing by not
  * supporting it. See `PropertyTranslation`'s class docs for more information.
  *
  * ---------------------------------------------------------------------
@@ -219,7 +226,11 @@ class FunctionTranslation
             return false;
         }
 
-        // Begin by removing and counting all leading underscores (important!).
+        // First, we must decode our encoded representation of any special PHP
+        // operators, just in case their property name had illegal chars.
+        $funcCase = SpecialOperators::decodeOperators($funcCase);
+
+        // Now remove and count all leading underscores (important!).
         // Example: "__MessageList" => "MessageList".
         $result = ltrim($funcCase, '_');
         $leadingUnderscores = strlen($funcCase) - strlen($result);

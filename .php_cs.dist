@@ -19,7 +19,7 @@ return PhpCsFixer\Config::create()
     ->setFinder(
         PhpCsFixer\Finder::create()
         ->in(__DIR__)
-        ->name('(^lazydoctor$|\.php$)')
+        ->name('/(?:^lazydoctor$|\.php$)/')
     )
     ->setIndent('    ')
     ->setLineEnding("\n")

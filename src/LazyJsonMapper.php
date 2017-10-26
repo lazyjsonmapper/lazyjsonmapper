@@ -1017,16 +1017,24 @@ class LazyJsonMapper implements Serializable
 
         // Header.
         printf(
-            "%s\n> Class:    \"%s\"\n  Supports: [%s] Virtual Functions [%s] Virtual Properties\n%s\n  Show Functions: %s.\n  Allow Relative Types: %s.\n  Include Undefined Properties: %s.\n%s\n",
+            '%s%s> Class:    "%s"%s  Supports: [%s] Virtual Functions [%s] Virtual Properties%s%s%s  Show Functions: %s.%s  Allow Relative Types: %s.%s  Include Undefined Properties: %s.%s%s%s',
             $equals_bar,
+            PHP_EOL,
             Utilities::createStrictClassPath(get_class($this)),
+            PHP_EOL,
             static::ALLOW_VIRTUAL_FUNCTIONS ? 'X' : ' ',
             static::ALLOW_VIRTUAL_PROPERTIES ? 'X' : ' ',
+            PHP_EOL,
             $dash_bar,
+            PHP_EOL,
             $showFunctions ? 'Yes' : 'No',
+            PHP_EOL,
             $allowRelativeTypes ? 'Yes' : 'No',
+            PHP_EOL,
             $includeUndefined ? 'Yes' : 'No',
-            $equals_bar
+            PHP_EOL,
+            $equals_bar,
+            PHP_EOL
         );
 
         // Properties.
@@ -1042,40 +1050,43 @@ class LazyJsonMapper implements Serializable
 
             // Output core information about the property.
             printf(
-                "  #%s/%s: \"%s\"%s\n%s: \"%s\"%s\n",
+                '  #%s/%s: "%s"%s%s%s: "%s"%s%s',
                 str_pad($thisPropertyNum, $padNumDigitsTo, '0', STR_PAD_LEFT),
                 str_pad($lastPropertyNum, $padNumDigitsTo, '0', STR_PAD_LEFT),
                 $property->name,
                 !$property->is_defined ? ' (Not in class property map!)' : '',
+                PHP_EOL,
                 str_pad('* Type', $alignPadding, ' ', STR_PAD_LEFT),
                 $property->type,
-                $property->is_basic_type ? ' (Basic PHP type)' : ''
+                $property->is_basic_type ? ' (Basic PHP type)' : '',
+                PHP_EOL
             );
 
             // Optionally output the function list as well.
             if ($showFunctions) {
                 foreach (['has', 'is', 'get', 'set', 'unset'] as $function) {
                     printf(
-                        "%s: %s\n",
+                        '%s: %s%s',
                         str_pad($function, $alignPadding, ' ', STR_PAD_LEFT),
-                        $property->{"function_{$function}"}
+                        $property->{"function_{$function}"},
+                        PHP_EOL
                     );
                 }
             }
 
             // Dividers between properties.
             if ($thisPropertyNum !== $lastPropertyNum) {
-                echo "{$dash_bar}\n";
+                echo $dash_bar.PHP_EOL;
             }
         }
 
         // Handle empty property lists.
         if (empty($descriptions)) {
-            echo "- No properties.\n";
+            echo '- No properties.'.PHP_EOL;
         }
 
         // Footer.
-        echo "{$equals_bar}\n";
+        echo $equals_bar.PHP_EOL;
     }
 
     /**
@@ -1401,7 +1412,13 @@ class LazyJsonMapper implements Serializable
         $depth = 512)
     {
         $options = $prettyPrint ? JSON_PRETTY_PRINT : 0;
-        echo $this->asJson($options, $depth).PHP_EOL; // Throws.
+        $json = $this->asJson($options, $depth); // Throws.
+        if ($prettyPrint && PHP_EOL !== "\n") {
+            // PHP's JSON pretty-printing uses "\n" line endings, which must be
+            // translated for proper display if that isn't the system's style.
+            $json = str_replace("\n", PHP_EOL, $json);
+        }
+        echo $json.PHP_EOL;
     }
 
     /**

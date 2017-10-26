@@ -20,7 +20,7 @@ namespace LazyJsonMapper\Magic;
 /**
  * Compatibility translation layer for illegal operator characters.
  *
- * Takes care of encoding/encoding illegal characters (special PHP operators)
+ * Takes care of encoding/decoding illegal characters (special PHP operators)
  * in JSON property names, to ensure that the resulting function name is legal.
  *
  * @copyright 2017 The LazyJsonMapper Project
@@ -107,7 +107,9 @@ class SpecialOperators
      * recognize the sequences we've chosen: `getEn_x2D_US()`, where `x` stands
      * for "hex", and `2D` is the hex character value for the minus symbol.
      *
-     * This encoding allows us to easily encode any future illegal characters.
+     * This particular encoding also allows us to easily encode future illegal
+     * characters of any length (even multiple bytes such as `_xFFFF_` if ever
+     * necessary) without needing to change the encoding scheme again.
      */
     private static function _buildTranslations()
     {

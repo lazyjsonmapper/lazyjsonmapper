@@ -101,7 +101,7 @@ class FunctionTranslation
      *
      * @throws MagicTranslationException If the `$funcCase` name is unparseable.
      *
-     * @see FunctionTranslation::splitFunctionName() For a helper to split your
+     * @see FunctionTranslation::splitFunctionName() A helper to split your
      *                                               function names into the
      *                                               necessary parts.
      */

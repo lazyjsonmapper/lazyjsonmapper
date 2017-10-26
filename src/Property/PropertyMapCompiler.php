@@ -317,9 +317,10 @@ class PropertyMapCompiler
      * @throws BadPropertyMapException
      * @throws CircularPropertyMapException
      *
-     * @see PropertyMapCompiler::compileClassPropertyMap() For the truly public,
-     *                                                     static entry point.
-     * @see PropertyMapCompiler::_compile()                For internal core.
+     * @see PropertyMapCompiler::compileClassPropertyMap() The public, static
+     *                                                     class entry point.
+     * @see PropertyMapCompiler::_compile()                The internal compiler
+     *                                                     core.
      */
     public function compile()
     {
@@ -353,7 +354,7 @@ class PropertyMapCompiler
      * @throws BadPropertyMapException
      * @throws CircularPropertyMapException
      *
-     * @see PropertyMapCompiler::compile() For the wrapper entry point.
+     * @see PropertyMapCompiler::compile() The wrapper entry point.
      */
     private function _compile()
     {

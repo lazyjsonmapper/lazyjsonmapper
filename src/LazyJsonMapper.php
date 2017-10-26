@@ -225,7 +225,7 @@ class LazyJsonMapper implements Serializable
      *
      * @var bool
      *
-     * @see LazyJsonMapper::__get() For more details about virtual properties.
+     * @see LazyJsonMapper::__get() More details about virtual properties.
      */
     const ALLOW_VIRTUAL_PROPERTIES = true;
 
@@ -242,7 +242,7 @@ class LazyJsonMapper implements Serializable
      *
      * @var bool
      *
-     * @see LazyJsonMapper::__call() For more details about virtual functions.
+     * @see LazyJsonMapper::__call() More details about virtual functions.
      */
     const ALLOW_VIRTUAL_FUNCTIONS = true;
 
@@ -503,13 +503,13 @@ class LazyJsonMapper implements Serializable
      *
      * @var array
      *
-     * @see LazyJsonMapper::printPropertyDescriptions() To easily look at and
-     *                                                  debug your final class
-     *                                                  property map.
-     * @see LazyJsonMapper::printJson()                 To look at the JSON data
+     * @see LazyJsonMapper::printPropertyDescriptions() Easily looking at and
+     *                                                  debugging your final
+     *                                                  class property map.
+     * @see LazyJsonMapper::printJson()                 Looking at the JSON data
      *                                                  contents of the current
      *                                                  object instance.
-     * @see LazyJsonMapper::exportClassAnalysis()       To look for problems
+     * @see LazyJsonMapper::exportClassAnalysis()       Looking for problems
      *                                                  with your class map.
      *                                                  However, the same test
      *                                                  can also be achieved
@@ -583,9 +583,9 @@ class LazyJsonMapper implements Serializable
      *
      * @var array
      *
-     * @see LazyJsonMapper::printPropertyDescriptions() To easily look at and
-     *                                                  debug your final class
-     *                                                  property map.
+     * @see LazyJsonMapper::printPropertyDescriptions() Easily looking at and
+     *                                                  debugging your final
+     *                                                  class property map.
      */
     private $_compiledPropertyMapLink;
 

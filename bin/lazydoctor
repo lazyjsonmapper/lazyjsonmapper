@@ -72,7 +72,7 @@ date_default_timezone_set('UTC');
 
 // Verify minimum PHP version.
 if (!defined('PHP_VERSION_ID') || PHP_VERSION_ID < 50600) {
-    fwrite(STDERR, "LazyDoctor requires PHP 5.6 or higher.\n");
+    fwrite(STDERR, 'LazyDoctor requires PHP 5.6 or higher.'.PHP_EOL);
     exit(1);
 }
 
@@ -122,6 +122,7 @@ $specs->add('c|composer:=file', 'Path to your project\'s composer.json file.');
 $specs->add('p|properties?=boolean', 'Document virtual properties (if enabled for the classes).');
 $specs->add('f|functions?=boolean', 'Document virtual functions (if enabled for the classes).');
 $specs->add('o|document-overridden?=boolean', 'Always document virtual functions/properties even when they have been manually overridden by the class (or its parents).');
+$specs->add('w|windows?=boolean', 'Generate Windows-style ("\r\n") documentation line endings instead of the default Unix-style ("\n").');
 $specs->add('validate-only?=boolean', 'Validate current docs for all classes but don\'t write anything to disk.');
 $specs->add('h|help?=boolean', 'Show all available options.');
 
@@ -133,6 +134,7 @@ try {
         'properties'          => isset($result->keys['properties']) && $result->keys['properties']->value !== false,
         'functions'           => isset($result->keys['functions']) && $result->keys['functions']->value !== false,
         'document-overridden' => isset($result->keys['document-overridden']) && $result->keys['document-overridden']->value !== false,
+        'windows'             => isset($result->keys['windows']) && $result->keys['windows']->value !== false,
         'validate-only'       => isset($result->keys['validate-only']) && $result->keys['validate-only']->value !== false,
         'help'                => isset($result->keys['help']) && $result->keys['help']->value !== false,
     ];
@@ -143,26 +145,26 @@ try {
 }
 
 // Verify options...
-echo "[ LazyDoctor ]\n\n";
+echo '[ LazyDoctor ]'.PHP_EOL.PHP_EOL;
 if ($options['composer'] === null || $options['help']) {
     if ($options['composer'] === null) {
-        fwrite(STDERR, "You must provide the --composer option.\n\n");
+        fwrite(STDERR, 'You must provide the --composer option.'.PHP_EOL.PHP_EOL);
     }
     $printer = new ConsoleOptionPrinter();
-    echo "Available options:\n\n";
+    echo 'Available options:'.PHP_EOL.PHP_EOL;
     echo $printer->render($specs);
     exit($options['composer'] === null && !$options['help'] ? 1 : 0);
 }
 
 if ($options['composer']->getBasename() !== 'composer.json') {
-    fwrite(STDERR, "You must point to your project's composer.json file.\nYou used: \"".$options['composer']->getRealPath()."\".\n");
+    fwrite(STDERR, 'You must point to your project\'s composer.json file.'.PHP_EOL.'You used: "'.$options['composer']->getRealPath().'".'.PHP_EOL);
     exit(1);
 }
 
 // Decode the composer.json file...
 $json = @json_decode(file_get_contents($options['composer']->getRealPath()), true);
 if ($json === null) {
-    fwrite(STDERR, "Unable to decode composer.json.\n");
+    fwrite(STDERR, 'Unable to decode composer.json.'.PHP_EOL);
     exit(1);
 }
 
@@ -179,20 +181,20 @@ foreach (['autoload', 'autoload-dev'] as $type) {
     foreach ($json[$type]['psr-4'] as $namespace => $dir) {
         // We don't support composer's empty "fallback" namespaces.
         if ($namespace === '') {
-            fwrite(STDERR, "Encountered illegal unnamed PSR-4 autoload namespace in composer.json.\n");
+            fwrite(STDERR, 'Encountered illegal unnamed PSR-4 autoload namespace in composer.json.'.PHP_EOL);
             exit(1);
         }
 
         // Ensure that the namespace ends in backslash.
         if (substr_compare($namespace, '\\', strlen($namespace) - 1, 1) !== 0) {
-            fwrite(STDERR, "Encountered illegal namespace \"{$namespace}\" (does not end in backslash) in composer.json.\n");
+            fwrite(STDERR, 'Encountered illegal namespace "'.$namespace.'" (does not end in backslash) in composer.json.'.PHP_EOL);
             exit(1);
         }
 
         // Ensure that the value is a string.
         // NOTE: We allow empty strings, which corresponds to root folder.
         if (!is_string($dir)) {
-            fwrite(STDERR, "Encountered illegal non-string value for namespace \"{$namespace}\".\n");
+            fwrite(STDERR, 'Encountered illegal non-string value for namespace "'.$namespace.'".'.PHP_EOL);
             exit(1);
         }
 
@@ -200,13 +202,13 @@ foreach (['autoload', 'autoload-dev'] as $type) {
         $path = sprintf('%s/%s', $projectRoot, $dir);
         $realpath = realpath($path);
         if ($realpath === false) {
-            fwrite(STDERR, "Unable to resolve real path for \"{$path}\".\n");
+            fwrite(STDERR, 'Unable to resolve real path for "'.$path.'".'.PHP_EOL);
             exit(1);
         }
 
         // We don't allow the same directory to be defined multiple times.
         if (isset($namespaces[$realpath])) {
-            fwrite(STDERR, "Encountered duplicate namespace directory \"{$realpath}\" in composer.json.\n");
+            fwrite(STDERR, 'Encountered duplicate namespace directory "'.$realpath.'" in composer.json.'.PHP_EOL);
             exit(1);
         }
 
@@ -217,7 +219,7 @@ foreach (['autoload', 'autoload-dev'] as $type) {
 
 // Verify that we found some namespaces...
 if (empty($namespaces)) {
-    fwrite(STDERR, "There are no PSR-4 autoload namespaces in your composer.json.\n");
+    fwrite(STDERR, 'There are no PSR-4 autoload namespaces in your composer.json.'.PHP_EOL);
     exit(1);
 }
 
@@ -226,27 +228,25 @@ if (empty($namespaces)) {
 $autoload = sprintf('%s/vendor/autoload.php', $projectRoot);
 $realautoload = realpath($autoload);
 if ($realautoload === false) {
-    fwrite(STDERR, "Unable to find the project's Composer autoloader (\"{$autoload}\").\n");
+    fwrite(STDERR, 'Unable to find the project\'s Composer autoloader ("'.$autoload.'").'.PHP_EOL);
     exit(1);
 }
 require $realautoload;
 
 // Verify that their project's autoloader contains LazyJsonMapper...
 if (!class_exists('\LazyJsonMapper\LazyJsonMapper', true)) { // TRUE = Autoload.
-    fwrite(STDERR, "Target project doesn't contain the LazyJsonMapper library.\n");
+    fwrite(STDERR, 'Target project doesn\'t contain the LazyJsonMapper library.'.PHP_EOL);
     exit(1);
 }
 
 // Alright, display the current options...
-printf(
-    "Project: \"%s\".\n- [%s] Document Virtual Properties (\"@property\").\n- [%s] Document Virtual Functions (\"@method\").\n- [%s] Document Overridden Properties/Functions.\n",
-    $projectRoot,
-    $options['properties'] ? 'X' : ' ',
-    $options['functions'] ? 'X' : ' ',
-    $options['document-overridden'] ? 'X' : ' '
-);
+echo 'Project: "'.$projectRoot.'".'.PHP_EOL
+    .'- Documentation Line Endings: '.($options['windows'] ? 'Windows ("\r\n")' : 'Unix ("\n")').'.'.PHP_EOL
+    .'- ['.($options['properties'] ? 'X' : ' ').'] Document Virtual Properties ("@property").'.PHP_EOL
+    .'- ['.($options['functions'] ? 'X' : ' ').'] Document Virtual Functions ("@method").'.PHP_EOL
+    .'- ['.($options['document-overridden'] ? 'X' : ' ').'] Document Overridden Properties/Functions.'.PHP_EOL;
 if ($options['validate-only']) {
-    echo "- This is a validation run. Nothing will be written to disk.\n";
+    echo '- This is a validation run. Nothing will be written to disk.'.PHP_EOL;
 }
 
 // We can now use our custom classes, since the autoloader has been imported...
@@ -277,6 +277,9 @@ class LazyClassDocumentor
     /** @var array */
     private $_options;
 
+    /** @var string Newline sequence. */
+    private $_nl;
+
     /**
      * Constructor.
      *
@@ -294,6 +297,7 @@ class LazyClassDocumentor
         }
         $this->_reflector = new ReflectionClass($class);
         $this->_options = $options;
+        $this->_nl = $options['windows'] ? "\r\n" : "\n";
     }
 
     /**
@@ -370,8 +374,10 @@ class LazyClassDocumentor
             }
             unset($line);
             $finalDocComment = sprintf(
-                "/**\n%s\n */",
-                implode("\n", $finalDocLines)
+                '/**%s%s%s */',
+                $this->_nl,
+                implode($this->_nl, $finalDocLines),
+                $this->_nl
             );
         } else {
             // The FALSE signifies that we want no class doc-block at all...
@@ -387,7 +393,7 @@ class LazyClassDocumentor
 
         // The docs mismatch. If this is a validate-run, just return false now.
         if ($this->_options['validate-only']) {
-            fwrite(STDERR, "> Outdated class docs encountered in \"{$thisClassName}\". Aborting scan...\n");
+            fwrite(STDERR, '> Outdated class docs encountered in "'.$thisClassName.'". Aborting scan...'.PHP_EOL);
 
             return false;
         }
@@ -396,7 +402,7 @@ class LazyClassDocumentor
         $classFileName = $this->_reflector->getFileName();
         $fileLines = @file($classFileName);
         if ($fileLines === false) {
-            fwrite(STDERR, "> Unable to read class file from disk: \"{$classFileName}\".\n");
+            fwrite(STDERR, '> Unable to read class file from disk: "'.$classFileName.'".'.PHP_EOL);
 
             return false;
         }
@@ -426,7 +432,7 @@ class LazyClassDocumentor
                 if (strpos($startLines[$i], '*/') !== false) {
                     $deleteTo = $i;
                 }
-                if (preg_match('/^\s*\/\*\*\s/', $startLines[$i])) {
+                if (preg_match('/^\s*\/\*\*\s/u', $startLines[$i])) {
                     $deleteFrom = $i;
                     break;
                 }
@@ -434,7 +440,7 @@ class LazyClassDocumentor
 
             // Ensure that we have found valid comment-offsets.
             if ($deleteFrom === null || $deleteTo === null || $deleteTo < $deleteFrom) {
-                fwrite(STDERR, "> Unable to parse current class comment on disk: \"{$classFileName}\".\n");
+                fwrite(STDERR, '> Unable to parse current class comment on disk: "'.$classFileName.'".'.PHP_EOL);
 
                 return false;
             }
@@ -444,7 +450,7 @@ class LazyClassDocumentor
                 if ($k === $deleteFrom && $finalDocComment !== false) {
                     // We've found the first line of the old comment, and we
                     // have a new comment. So replace that array entry.
-                    $startLines[$k] = $finalDocComment."\n";
+                    $startLines[$k] = $finalDocComment.$this->_nl;
                 } elseif ($k >= $deleteFrom && $k <= $deleteTo) {
                     // Delete all other comment lines, including the first line
                     // if we had no new doc-comment.
@@ -460,7 +466,7 @@ class LazyClassDocumentor
             // There's no existing doc-comment. Just add ours above the class.
             // NOTE: This only does something if we had a new comment to insert,
             // which we SHOULD have since we came this far in this scenario...
-            $startLines[] = $finalDocComment."\n";
+            $startLines[] = $finalDocComment.$this->_nl;
         }
 
         // Generate the new file contents.
@@ -472,11 +478,11 @@ class LazyClassDocumentor
         // never be able to corrupt the class-files on disk via partial writes.
         $written = Utilities::atomicWrite($classFileName, $newFileContent);
         if ($written !== false) {
-            echo "> Wrote updated class documentation to disk: \"{$classFileName}\".\n";
+            echo '> Wrote updated class documentation to disk: "'.$classFileName.'".'.PHP_EOL;
 
             return true;
         } else {
-            fwrite(STDERR, "> Unable to write new class documentation to disk: \"{$classFileName}\".\n");
+            fwrite(STDERR, '> Unable to write new class documentation to disk: "'.$classFileName.'".'.PHP_EOL);
 
             return false;
         }
@@ -497,14 +503,14 @@ class LazyClassDocumentor
         }
 
         // Remove the leading and trailing doc-comment tags (/** and */).
-        $currentDocComment = preg_replace('/(^\s*\/\*\*\s*|\s*\*\/$)/', '', $currentDocComment);
+        $currentDocComment = preg_replace('/(^\s*\/\*\*\s*|\s*\*\/$)/u', '', $currentDocComment);
 
         // Process all lines. Skip all @method and @property lines.
         $relevantLines = [];
-        $lines = preg_split('/[\r\n]+/', $currentDocComment, -1, PREG_SPLIT_NO_EMPTY);
+        $lines = preg_split('/\r?\n|\r/u', $currentDocComment);
         foreach ($lines as $line) {
             // Remove leading and trailing whitespace, and leading asterisks.
-            $line = trim(preg_replace('/^\s*\*+/', '', $line));
+            $line = trim(preg_replace('/^\s*\*+/u', '', $line));
 
             // Skip this line if it's a @method or @property line.
             // NOTE: Removing them is totally safe, because the LazyJsonMapper
@@ -512,7 +518,7 @@ class LazyClassDocumentor
             // final, which means that people's subclasses CANNOT override them
             // to add their own magic methods/properties. So therefore we KNOW
             // that ALL existing @method/@property class doc lines belong to us!
-            if (preg_match('/^@(?:method|property)/', $line)) {
+            if (preg_match('/^@(?:method|property)/u', $line)) {
                 continue;
             }
 
@@ -646,7 +652,7 @@ class LazyClassDocumentor
 
 // Now process all PHP files under all of the project's namespace folders.
 foreach ($namespaces as $realpath => $namespace) {
-    printf("\nProcessing namespace \"%s\".\n- Path: \"%s\".\n", $namespace, $realpath);
+    echo PHP_EOL.'Processing namespace "'.$namespace.'".'.PHP_EOL.'- Path: "'.$realpath.'".'.PHP_EOL;
     $realpathlen = strlen($realpath);
 
     $iterator = new RegexIterator(
@@ -657,20 +663,20 @@ foreach ($namespaces as $realpath => $namespace) {
         // Determine the real path to the file (compatible with $realpath).
         $realfile = realpath($file);
         if ($realfile === false) {
-            fwrite(STDERR, "Unable to determine real path to file \"{$file}\".\n");
+            fwrite(STDERR, 'Unable to determine real path to file "'.$file.'".'.PHP_EOL);
             exit(1);
         }
 
         // Now ensure that the file starts with the expected path...
         if (strncmp($realpath, $realfile, $realpathlen) !== 0) {
-            fwrite(STDERR, "Unexpected path to file \"{$realfile}\". Does not match project path.\n");
+            fwrite(STDERR, 'Unexpected path to file "'.$realfile.'". Does not match project path.'.PHP_EOL);
             exit(1);
         }
         $class = substr($realfile, $realpathlen);
 
         // Remove the leading slash for the folder...
         if ($class[0] !== '/' && $class[0] !== '\\') {
-            fwrite(STDERR, "Unexpected path to file \"{$realfile}\". Does not match project path.\n");
+            fwrite(STDERR, 'Unexpected path to file "'.$realfile.'". Does not match project path.'.PHP_EOL);
             exit(1);
         }
         $class = substr($class, 1);
@@ -679,7 +685,7 @@ foreach ($namespaces as $realpath => $namespace) {
         $class = sprintf(
             '%s%s',
             $namespace,
-            str_replace('/', '\\', preg_replace('/\.php$/i', '', $class))
+            str_replace('/', '\\', preg_replace('/\.php$/ui', '', $class))
         );
 
         // Some files may not contain classes. For example, some people have
@@ -695,9 +701,9 @@ foreach ($namespaces as $realpath => $namespace) {
         $result = $documentor->process();
         if (!$result) {
             if ($options['validate-only']) {
-                fwrite(STDERR, "> One or more files need updated class documentation.\n");
+                fwrite(STDERR, '> One or more files need updated class documentation.'.PHP_EOL);
             } else {
-                fwrite(STDERR, "> Error while processing class \"{$class}\". Aborting...\n");
+                fwrite(STDERR, '> Error while processing class "'.$class.'". Aborting...'.PHP_EOL);
             }
             exit(1);
         }

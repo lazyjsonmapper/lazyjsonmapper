@@ -25,6 +25,10 @@
  * PHPdoc blocks. That documentation is necessary for things like code analysis
  * tools and IDE autocomplete for all of your virtual properties/functions!
  *
+ * LazyDoctor also performs class diagnostics: It compiles the class property
+ * maps of _all_ of your LazyJsonMapper-based classes, which means that you can
+ * be 100% sure that all of your maps are valid if this tool runs successfully.
+ *
  * To see all available options, type "./vendor/bin/lazydoctor --help".
  *
  * To begin, simply point the "--composer" option at the "composer.json" file
@@ -324,10 +328,16 @@ class LazyClassDocumentor
         // Compile this class property map if not yet built and cached.
         $thisClassName = $this->_reflector->getName();
         if (!isset(self::$_propertyMapCache->classMaps[$thisClassName])) {
-            PropertyMapCompiler::compileClassPropertyMap( // Throws.
-                self::$_propertyMapCache,
-                $thisClassName
-            );
+            try {
+                PropertyMapCompiler::compileClassPropertyMap( // Throws.
+                    self::$_propertyMapCache,
+                    $thisClassName
+                );
+            } catch (Exception $e) {
+                fwrite(STDERR, '> Unable to compile the class property map for "'.$thisClassName.'". Reason: '.$e->getMessage().PHP_EOL);
+
+                return false;
+            }
         }
 
         // Now link to the property map cache for our current class.
@@ -701,7 +711,7 @@ foreach ($namespaces as $realpath => $namespace) {
         $result = $documentor->process();
         if (!$result) {
             if ($options['validate-only']) {
-                fwrite(STDERR, '> One or more files need updated class documentation.'.PHP_EOL);
+                fwrite(STDERR, '> One or more files need updated class documentation or contain other errors.'.PHP_EOL);
             } else {
                 fwrite(STDERR, '> Error while processing class "'.$class.'". Aborting...'.PHP_EOL);
             }

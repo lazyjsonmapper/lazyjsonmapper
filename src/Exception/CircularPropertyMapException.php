@@ -20,11 +20,14 @@ namespace LazyJsonMapper\Exception;
 /**
  * Means that there is a circular reference in the property map's imports.
  *
- * Examples: `B extends A, A imports B` (which is impossible since no class
+ * Examples: `B extends A, B imports A` (which is impossible since no class
  * `extends` are allowed to import any part of their own inheritance tree), or
  * `AB[C] imports ABC[D]` (which is impossible, since `D` relies on `C` which is
  * not yet done being compiled, since `C` is currently trying to import `D` to
- * resolve itself).
+ * resolve itself), or `X imports Y, Y imports X` (where two otherwise-unrelated
+ * classes are trying to import each other, which is an unresolvable circular
+ * reference where neither class can finish their compilation, since they both
+ * depend on each other).
  *
  * @copyright 2017 The LazyJsonMapper Project
  * @license http://www.apache.org/licenses/LICENSE-2.0

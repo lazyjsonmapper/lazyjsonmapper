@@ -1081,6 +1081,16 @@ class PropertyMapCompiler
             ));
         }
 
+        // FATAL: If the encountered import-statement literally refers to itself
+        // (the class we're currently compiling in the hierarchy), then it's a
+        // totally ridiculous circular self-reference of the most insane kind.
+        if ($importClassName === $this->_currentClassInfo['className']) {
+            throw new CircularPropertyMapException(
+                $strictImportClassName,
+                $strictImportClassName
+            );
+        }
+
         // FATAL: If the import-statement refers to ANY class in OUR OWN
         // current class' hierarchy, then it's a circular self-reference. We
         // forbid those because they make ZERO sense. For example: "ABCD", in

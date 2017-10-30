@@ -1411,7 +1411,9 @@ class LazyJsonMapper implements Serializable
         $prettyPrint = true,
         $depth = 512)
     {
-        $options = $prettyPrint ? JSON_PRETTY_PRINT : 0;
+        // NOTE: These options are important. For display purposes, we don't
+        // want escaped slashes or `\uXXXX` hex versions of UTF-8 characters.
+        $options = ($prettyPrint ? JSON_PRETTY_PRINT : 0) | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
         $json = $this->asJson($options, $depth); // Throws.
         if ($prettyPrint && PHP_EOL !== "\n") {
             // PHP's JSON pretty-printing uses "\n" line endings, which must be

@@ -17,6 +17,7 @@
 
 namespace LazyJsonMapper;
 
+use JsonSerializable;
 use LazyJsonMapper\Exception\LazyJsonMapperException;
 use LazyJsonMapper\Exception\LazySerializationException;
 use LazyJsonMapper\Exception\LazyUserException;
@@ -199,7 +200,7 @@ use stdClass;
  * @license http://www.apache.org/licenses/LICENSE-2.0
  * @author SteveJobzniak (https://github.com/SteveJobzniak)
  */
-class LazyJsonMapper implements Serializable
+class LazyJsonMapper implements Serializable, JsonSerializable
 {
     /**
      * Whether "direct virtual properties" access is enabled.
@@ -1296,8 +1297,7 @@ class LazyJsonMapper implements Serializable
      * And most importantly, this function also guarantees that your data is
      * ALWAYS properly encoded as a valid JSON object `{}` (rather than risking
      * getting the result as a JSON array such as `[]` or `["a","b","c"]`).
-     * Therefore, you should ALWAYS use this function instead of a manual
-     * `json_encode()`. We accept all of the same parameters as that function!
+     * We accept all of the same parameters as the `json_encode()` function!
      *
      * Note that we only encode properties that exist in the actual internal
      * data. Anything that merely exists in the class property map is omitted.
@@ -1322,6 +1322,8 @@ class LazyJsonMapper implements Serializable
      * @see LazyJsonMapper::asStdClass()
      * @see LazyJsonMapper::asArray()
      * @see LazyJsonMapper::printJson()
+     * @see LazyJsonMapper::jsonSerialize()        The native json_encode()
+     *                                             serializer instead.
      */
     final public function asJson(
         $options = 0,
@@ -1332,31 +1334,7 @@ class LazyJsonMapper implements Serializable
         }
 
         // Create a fully-validated, fully-converted final object-tree.
-        // NOTE: It is VERY important that we export the data-copy with objects
-        // represented as stdClass objects. Otherwise json_encode() will be
-        // unable to understand which parts are JSON objects (whose keys must
-        // always be encoded as '{}' or '{"0":"a","1":"b"}') and which parts are
-        // JSON arrays (whose keys must always be encoded as '[]' or
-        // '["a","b"]').
-        // IMPORTANT NOTE: Any "untyped" objects from the original __construct()
-        // input ("mixed"/undefined data NOT mapped to LazyJsonMapper classes)
-        // will be encoded using PHP's own auto-detection for arrays, which
-        // GUESSES based on the keys of the array. It'll be guessing perfectly
-        // in almost 100% of all cases and will encode even those "untyped"
-        // arrays as JSON objects again, EXCEPT if an object from the original
-        // data used SEQUENTIAL numerical keys STARTING AT 0, such as:
-        // json_encode(json_decode('{"0":"a","1":"b"}', true)) which will result
-        // in '["a","b"]'. But that's incredibly rare (if ever), since it
-        // requires weird objects with numerical keys that START AT 0 and then
-        // sequentially go up from there WITHOUT ANY GAPS or ANY NON-NUMERIC
-        // keys. That should NEVER exist in any user's real JSON data, and it
-        // doesn't warrant internally representing all __construct() data as the
-        // incredibly inefficient stdClass type instead. If users REALLY want to
-        // perfectly encode such data as objects when they export as JSON, EVEN
-        // in the insanely-rare/impossible situation where their objects use
-        // sequential numeric keys, then they should at the very least map them
-        // to "LazyJsonMapper", which will ensure that they'll be preserved as
-        // objects in the final JSON output too.
+        // NOTE: See `jsonSerialize()` for details about why we MUST do this.
         $objectData = $this->exportObjectDataCopy('stdClass'); // Throws.
 
         // Gracefully handle JSON encoding and validation.
@@ -1421,6 +1399,83 @@ class LazyJsonMapper implements Serializable
             $json = str_replace("\n", PHP_EOL, $json);
         }
         echo $json.PHP_EOL;
+    }
+
+    /**
+     * Serialize this object to a value that's supported by json_encode().
+     *
+     * You are not supposed to call this directly. It is _automatically_ called
+     * by PHP whenever you attempt to `json_encode()` a `LazyJsonMapper` object
+     * or any data structures (such as arrays) which contain such objects. This
+     * function is then called and provides a proper "object representation"
+     * which can be natively encoded by PHP.
+     *
+     * Having this helper ensures that you can _easily_ encode very advanced
+     * structures (such as a regular PHP array which contains several nested
+     * `LazyJsonMapper`-based objects), _without_ needing to manually fiddle
+     * around with `asJson()` on every individual object within your array.
+     *
+     * You are instead able to simply `json_encode($mainObj->getSubArray())`,
+     * which will properly encode every array-element in that array, regardless
+     * of whether they're pure PHP types or nested `LazyJsonMapper` objects.
+     *
+     * Note that we only export properties that exist in the actual internal
+     * data. Anything that merely exists in the class property map is omitted.
+     *
+     * `WARNING:` It is worth saving the output of `json_encode()` if you intend
+     * to use the result multiple times, since each call to this function will
+     * internally use `exportObjectDataCopy()`, which performs quite intensive
+     * work to recursively validate and convert values while creating the final
+     * representation of the object's internal JSON data. Please read the
+     * description of `exportObjectDataCopy()` for more information.
+     *
+     * `WARNING:` In _most_ cases, you should be using `asJson()` (instead of
+     * `json_encode()`), since it's _far more_ convenient and completely wraps
+     * PHP's JSON encoding problems as exceptions. If you truly want to manually
+     * `json_encode()` the data, you'll still get complete data conversion and
+     * validation, but you _won't_ get any _automatic exceptions_ if PHP fails
+     * to encode the JSON, which means that _you'll_ have to manually check if
+     * the final value was successfully encoded by PHP. Just be aware of that!
+     *
+     * @throws LazyJsonMapperException If there are any conversion problems.
+     *
+     * @return stdClass A processed copy of the internal data, with all objects
+     *                  represented as stdClass. Usable by `json_encode()`.
+     *
+     * @see http://php.net/json_encode
+     * @see LazyJsonMapper::exportObjectDataCopy()
+     * @see LazyJsonMapper::asJson()
+     * @see LazyJsonMapper::printJson()
+     */
+    final public function jsonSerialize()
+    {
+        // Create a fully-validated, fully-converted final object-tree.
+        // NOTE: It is VERY important that we export the data-copy with objects
+        // represented as stdClass objects. Otherwise `json_encode()` will be
+        // unable to understand which parts are JSON objects (whose keys must
+        // always be encoded as `{}` or `{"0":"a","1":"b"}`) and which parts are
+        // JSON arrays (whose keys must always be encoded as `[]` or
+        // `["a","b"]`).
+        // IMPORTANT NOTE: Any "untyped" objects from the original JSON data
+        // input ("mixed"/undefined data NOT mapped to `LazyJsonMapper` classes)
+        // will be encoded using PHP's own auto-detection for arrays, which
+        // GUESSES based on the keys of the array. It'll be guessing perfectly
+        // in almost 100% of all cases and will encode even those "untyped"
+        // arrays as JSON objects again, EXCEPT if an object from the original
+        // data used SEQUENTIAL numerical keys STARTING AT 0, such as:
+        // `json_encode(json_decode('{"0":"a","1":"b"}', true))` which will
+        // result in `["a","b"]`. But that's incredibly rare (if ever), since it
+        // requires weird objects with numerical keys that START AT 0 and then
+        // sequentially go up from there WITHOUT ANY GAPS or ANY NON-NUMERIC
+        // keys. That should NEVER exist in any user's real JSON data, and it
+        // doesn't warrant internally representing all JSON object data as the
+        // incredibly inefficient stdClass type instead. If users REALLY want to
+        // perfectly encode such data as objects when they export as JSON, EVEN
+        // in the insanely-rare/impossible situation where their objects use
+        // sequential numeric keys, then they should at the very least map them
+        // to "LazyJsonMapper", which will ensure that they'll be preserved as
+        // objects in the final JSON output too.
+        return $this->exportObjectDataCopy('stdClass'); // Throws.
     }
 
     /**

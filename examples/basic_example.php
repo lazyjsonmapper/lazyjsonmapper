@@ -92,6 +92,9 @@ echo "\n\n";
  */
 
 // var_dump($section->asJson()); // Uncomment to get a JSON data string instead.
+// var_dump($section->getUsers()[0]->asJson()); // Property sub-object encoding.
+// var_dump(json_encode($section->getUsers())); // Property non-object values
+//                                              // solvable via `json_encode()`.
 $section->printJson();
 
 /*

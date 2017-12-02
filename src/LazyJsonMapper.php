@@ -76,7 +76,9 @@ use stdClass;
  *  - Includes the `LazyDoctor` tool, which _automatically_ documents all of
  *    your `LazyJsonMapper`-based classes so that their virtual properties and
  *    functions become _fully_ visible to your IDE and to various intelligent
- *    code analysis tools.
+ *    code analysis tools. It also performs class diagnostics by compiling all
+ *    of your class property maps, which means that you can be 100% sure that
+ *    all of your maps are valid (compilable) if this tool runs successfully.
  *
  *  - We provide a complete, internal API which your subclasses can use to
  *    interact with the data inside of the JSON container. This allows you to

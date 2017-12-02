@@ -41,7 +41,9 @@ without having to worry about doing any of the tedious parsing yourself.
 - Includes the `LazyDoctor` tool, which _automatically_ documents all of
   your `LazyJsonMapper`-based classes so that their virtual properties and
   functions become _fully_ visible to your IDE and to various intelligent
-  code analysis tools.
+  code analysis tools. It also performs class diagnostics by compiling all
+  of your class property maps, which means that you can be 100% sure that
+  all of your maps are valid (compilable) if this tool runs successfully.
 
 - We provide a complete, internal API which your subclasses can use to
   interact with the data inside of the JSON container. This allows you to
@@ -183,10 +185,11 @@ You can also [read the same documentation online](https://stevejobzniak.github.i
 
 ### LazyDoctor
 
-Our automatic class-documentation utility will be placed within your project's
-`./vendor/bin/` folder. Simply run it without any parameters to see a list of
-all available options. You can also open that file in a regular text editor to
-read some general usage tips and tricks at the top of the utility's source code.
+Our automatic class-documentation and diagnostic utility will be placed within
+your project's `./vendor/bin/` folder. Simply run it without any parameters to
+see a list of all available options. You can also open that file in a regular
+text editor to read some general usage tips and tricks at the top of the
+utility's source code.
 
 ### Copyright
 

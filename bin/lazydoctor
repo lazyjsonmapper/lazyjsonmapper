@@ -352,20 +352,37 @@ class LazyClassDocumentor
         // Extract all relevant lines from the current comment.
         $finalDocLines = $this->_extractRelevantLines($currentDocComment);
 
+        // Generate the automatic summary line (classname followed by period).
+        $autoSummaryLine = $this->_reflector->getShortName().'.';
+
+        // If the 1st line is a classname followed by a period, update the name.
+        // NOTE: This ensures that we update all outdated auto-added classnames,
+        // and the risk of false positives is very low since we only document
+        // `LazyJsonMapper`-based classes with a `OneWord.`-style summary line.
+        // NOTE: Regex is from http://php.net/manual/en/language.oop5.basic.php,
+        // and yes we must run it in NON-UNICODE MODE, so that it parses on a
+        // byte by byte basis exactly like the real PHP classname interpreter.
+        if (
+            isset($finalDocLines[0]) // The 1st line MUST exist to proceed.
+            && preg_match('/^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\.$/', $finalDocLines[0])
+        ) {
+            $finalDocLines[0] = $autoSummaryLine;
+        }
+
         // Generate the magic documentation lines for the current class.
         $magicDocLines = $this->_generateMagicDocs();
         if (!empty($magicDocLines)) {
-            // If there are no lines already... add an automatic summary line.
+            // If there are no lines already... add the automatic summary line.
             if (empty($finalDocLines)) {
-                $finalDocLines[] = $this->_reflector->getShortName().'.';
+                $finalDocLines[] = $autoSummaryLine;
             }
 
             // Check the 1st char of the 1st line. If it's an @tag of any kind,
             // insert automatic summary line at top and empty line after that.
-            if ($finalDocLines[0][0] === '@') {
+            elseif ($finalDocLines[0][0] === '@') {
                 array_unshift(
                     $finalDocLines,
-                    $this->_reflector->getShortName().'.',
+                    $autoSummaryLine,
                     ''
                 );
             }

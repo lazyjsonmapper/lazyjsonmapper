@@ -201,16 +201,11 @@ Copyright 2017 The LazyJsonMapper Project
 
 ### Author
 
-SteveJobzniak (https://github.com/SteveJobzniak)
+SteveJobzniak
 
 ### Contributing
 
 If you would like to contribute to this project, please feel free to submit a
-pull request, or perhaps even sending a donation as a token of your appreciation.
+pull request, or perhaps even sending a donation to a team member as a token of
+your appreciation.
 
-### Donate a beer?
-
-Totally optional, but _greatly_ appreciated if my hard work has helped you. ;-)
-
-- ![Paypal](https://raw.githubusercontent.com/reek/anti-adblock-killer/gh-pages/images/paypal.png) Paypal: [Donate](https://www.paypal.me/Armindale/0usd)
-- ![btc](https://raw.githubusercontent.com/reek/anti-adblock-killer/gh-pages/images/bitcoin.png) Bitcoin: 18XF1EmrkpYi4fqkR2XcHkcJxuTMYG4bcv

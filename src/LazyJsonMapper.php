@@ -522,7 +522,21 @@ class LazyJsonMapper implements Serializable, JsonSerializable
      */
     const JSON_PROPERTY_MAP = [];
 
-	const JSON_REQUIRED_PROPERTIES = [];
+    /**
+     * Tells us which properties are required.
+     *
+     * Example of importing one or more maps from other classes:
+     *
+     * ```php
+     * const JSON_REQUIRED_PROPERTIES = [
+     *     'property_1',
+     *     'property_2'
+     * ];
+     * ```
+     *
+     * @var array
+     */
+    const JSON_REQUIRED_PROPERTIES = [];
 
     /**
      * Magic virtual function lookup cache.

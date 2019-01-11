@@ -23,6 +23,7 @@ use LazyJsonMapper\Exception\LazySerializationException;
 use LazyJsonMapper\Exception\LazyUserException;
 use LazyJsonMapper\Exception\LazyUserOptionException;
 use LazyJsonMapper\Exception\MagicTranslationException;
+use LazyJsonMapper\Exception\RequiredPropertyException;
 use LazyJsonMapper\Export\ClassAnalysis;
 use LazyJsonMapper\Export\PropertyDescription;
 use LazyJsonMapper\Magic\FunctionTranslation;
@@ -520,6 +521,24 @@ class LazyJsonMapper implements Serializable, JsonSerializable
      *                                                  as a constructor flag.
      */
     const JSON_PROPERTY_MAP = [];
+
+    /**
+     * Tells us which properties are required.
+     *
+     * If property wasn't in JSON data we throw exception about it
+     *
+     * Example of importing one or more maps from other classes:
+     *
+     * ```php
+     * const JSON_REQUIRED_PROPERTIES = [
+     *     'property_1',
+     *     'property_2'
+     * ];
+     * ```
+     *
+     * @var array
+     */
+    const JSON_REQUIRED_PROPERTIES = [];
 
     /**
      * Magic virtual function lookup cache.
@@ -1912,6 +1931,7 @@ class LazyJsonMapper implements Serializable, JsonSerializable
      *                                 if the property doesn't exist in either
      *                                 the class property definition or the
      *                                 object instance's data.
+     * @throws RequiredPropertyException If property was not found in data.
      *
      * @return mixed The value as the correct type, or `NULL` if it's either a
      *               literal `NULL` in the data or if no value currently existed
@@ -1930,6 +1950,13 @@ class LazyJsonMapper implements Serializable, JsonSerializable
             // The value exists in the data, so refer directly to it.
             $value = &$this->_objectData[$propName]; // IMPORTANT: By reference!
         } elseif ($createMissingValue) {
+            if ($propDef->required) {
+                throw new RequiredPropertyException(sprintf(
+                    'Expected property was not found "%s"',
+                    $propName
+                ));
+            }
+
             // No value exists in data yet, AND the caller wants us to create
             // a default NULL value for the data property in that situation.
             // NOTE: This is IMPORTANT so that the returned "default NULL"
@@ -1951,6 +1978,13 @@ class LazyJsonMapper implements Serializable, JsonSerializable
             $value = &$this->_objectData[$propName]; // IMPORTANT: By reference!
             return $value; // OPTIMIZATION: Skip convert() for missing data.
         } else {
+            if ($propDef->required) {
+                throw new RequiredPropertyException(sprintf(
+                    'Expected property was not found "%s"',
+                    $propName
+                ));
+            }
+
             // No value exists in data yet, but the caller didn't want us to set
             // the missing value. So we'll simply use a default NULL variable.
             // NOTE: If the caller tries to write to this one by reference,
@@ -2074,12 +2108,13 @@ class LazyJsonMapper implements Serializable, JsonSerializable
      * @param string $functionName Name of the function being called.
      * @param array  $arguments    Array of arguments passed to the function.
      *
-     * @throws LazyUserOptionException If virtual functions are disabled.
-     * @throws LazyJsonMapperException If the function type or property name is
-     *                                 invalid, or if there's any problem with
-     *                                 the conversion to/from the object
-     *                                 instance's internal data. As well as if
-     *                                 the setter doesn't get exactly 1 arg.
+     * @throws LazyUserOptionException   If virtual functions are disabled.
+     * @throws LazyJsonMapperException   If the function type or property name is
+     *                                   invalid, or if there's any problem with
+     *                                   the conversion to/from the object
+     *                                   instance's internal data. As well as if
+     *                                   the setter doesn't get exactly 1 arg.
+     * @throws RequiredPropertyException If property was not found in data.
      *
      * @return mixed The return value depends on which function is used.
      *
@@ -2314,12 +2349,13 @@ class LazyJsonMapper implements Serializable, JsonSerializable
      *
      * @param string $propName The property name.
      *
-     * @throws LazyUserOptionException If virtual properties are disabled.
-     * @throws LazyJsonMapperException If the value can't be turned into its
-     *                                 assigned class or built-in PHP type, or
-     *                                 if the property doesn't exist in either
-     *                                 the class property definition or the
-     *                                 object instance's data.
+     * @throws LazyUserOptionException   If virtual properties are disabled.
+     * @throws LazyJsonMapperException   If the value can't be turned into its
+     *                                   assigned class or built-in PHP type, or
+     *                                   if the property doesn't exist in either
+     *                                   the class property definition or the
+     *                                   object instance's data.
+     * @throws RequiredPropertyException If property was not found in data.
      *
      * @return mixed The value as the correct type, or `NULL` if it's either a
      *               literal `NULL` in the data or if no value currently existed

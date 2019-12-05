@@ -93,6 +93,17 @@ class FunctionTranslation
     public $camelPropName;
 
     /**
+     * The property name in "dot" style.
+     *
+     * For example `some.example.property`.
+     *
+     * `NOTE:` This is `NULL` if the property consists only of a single word.
+     *
+     * @var string|null
+     */
+    public $dotPropName;
+
+    /**
      * Constructor.
      *
      * @param string $funcCase The "property" portion of the function name to
@@ -124,6 +135,7 @@ class FunctionTranslation
         // We are done with the conversions.
         $this->snakePropName = $result['snake'];
         $this->camelPropName = $result['camel'];
+        $this->dotPropName   = $result['dot'];
     }
 
     /**
@@ -304,11 +316,13 @@ class FunctionTranslation
             $chunks[$i] = lcfirst($chunks[$i]); // Only first letter can be UC.
         }
         $snakePropName = implode('_', $chunks);
+        $dotPropName = implode('.', $chunks);
 
         // Return the final snake_case and camelCase property names.
         return [
             'snake' => $snakePropName,
             'camel' => $camelPropName,
+            'dot'   => $dotPropName,
         ];
     }
 }

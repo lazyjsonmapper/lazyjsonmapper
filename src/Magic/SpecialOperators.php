@@ -158,10 +158,15 @@ class SpecialOperators
 
         $translations = ['encode' => [], 'decode' => []];
         foreach ($operators as $chr) {
-            $hex = str_pad(strtoupper(dechex(ord($chr))), 2, '0', STR_PAD_LEFT);
-            $encoded = sprintf('_x%s_', $hex);
-            $translations['encode'][$chr] = $encoded;
-            $translations['decode'][$encoded] = $chr;
+            if ($chr === '.') {
+                $translations['encode'][$chr] = '';
+                $translations['decode'][$encoded] = $chr;
+            } else {
+                $hex = str_pad(strtoupper(dechex(ord($chr))), 2, '0', STR_PAD_LEFT);
+                $encoded = sprintf('_x%s_', $hex);
+                $translations['encode'][$chr] = $encoded;
+                $translations['decode'][$encoded] = $chr;
+            }
         }
 
         self::$_translations = $translations;

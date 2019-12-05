@@ -155,7 +155,8 @@ class PropertyTranslation
         $leadingUnderscores = strlen($propName) - strlen($result);
 
         // Now simply uppercase any lowercase (a-z) character that is either at
-        // the start of the string or appears immediately after an underscore.
+        // the start of the string or appears immediately after an underscore or
+        // a dot.
         //
         // ----------------------------------------
         // TODO: If someone is using Unicode in their JSON data, we should
@@ -173,7 +174,7 @@ class PropertyTranslation
         // together with all the ASCII entries, since they'd use their UTF-8
         // names as key and thus never clash with anything from this algorithm.
         // ----------------------------------------
-        $result = preg_replace_callback('/(?:^|_)([a-z])/', function ($matches) {
+        $result = preg_replace_callback('/(?:^|_|\.)([a-z])/', function ($matches) {
             return ucfirst($matches[1]); // Always contains just 1 character.
         }, $result);
 

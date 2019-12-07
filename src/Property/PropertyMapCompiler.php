@@ -709,6 +709,11 @@ class PropertyMapCompiler
                                              ->getDeclaringClass()->getName()
                                              === $this->_currentClassInfo['className']);
                 }
+                $reflectionConstant = $this->_currentClassInfo['reflector']
+                    ->getReflectionConstant('JSON_REQUIRED_PROPERTIES');
+                $rawClassRequiredPropertiesMap = $reflectionConstant === false
+                    ? []
+                    : $reflectionConstant->getValue();
             } else {
                 // In older PHP versions, we're pretty limited... we don't get
                 // ANY extra information about the constants. We just get their
@@ -781,6 +786,9 @@ class PropertyMapCompiler
                     // new "previous" value after this iteration.
                     $this->_previousMapConstantValue = $rawClassPropertyMap;
                 }
+                $rawClassRequiredPropertiesMap = array_key_exists('JSON_REQUIRED_PROPERTIES', $classConstants)
+                    ? $classConstants['JSON_REQUIRED_PROPERTIES']
+                    : [];
             }
             if (!$foundConstant) {
                 // The constant doesn't exist. Should never be able to happen
@@ -833,12 +841,22 @@ class PropertyMapCompiler
                         $this->_currentClassInfo['strictClassName']
                     ));
                 }
+                if (!is_array($rawClassRequiredPropertiesMap)) {
+                    throw new BadPropertyMapException(sprintf(
+                        'Invalid JSON required properties map in class "%s". The map must be an array.',
+                        $this->_currentClassInfo['strictClassName']
+                    ));
+                }
                 foreach ($rawClassPropertyMap as $propName => $propDefStr) {
+                    // Check if property required or not
+                    $required = array_search($propName, $rawClassRequiredPropertiesMap) !== false;
+
                     // Process the current entry and add it to the current
                     // class' compiled property map if the entry is new/diff.
                     $this->_processPropertyMapEntry( // Throws.
                         $propName,
-                        $propDefStr
+                        $propDefStr,
+                        $required
                     );
                 }
             }
@@ -888,6 +906,8 @@ class PropertyMapCompiler
      *                               or the class to import, but may be
      *                               something else if the user has written an
      *                               invalid class property map.
+     * @param bool       $required   Explain if we expect property in data
+     *
      *
      * @throws BadPropertyDefinitionException
      * @throws BadPropertyMapException
@@ -895,7 +915,8 @@ class PropertyMapCompiler
      */
     private function _processPropertyMapEntry(
         $propName,
-        $propDefStr)
+        $propDefStr,
+        $required)
     {
         if (is_string($propName) && is_string($propDefStr)) {
             // This is a string key -> string value pair, so let's attempt to
@@ -903,7 +924,8 @@ class PropertyMapCompiler
             // our current class map if the entry is new/different.
             $this->_processPropertyDefinitionString( // Throws.
                 $propName,
-                $propDefStr
+                $propDefStr,
+                $required
             );
         } else {
             // It cannot be a regular property definition. Check if this is an
@@ -961,12 +983,14 @@ class PropertyMapCompiler
      *
      * @param string $propName   The property name.
      * @param string $propDefStr A string describing the property.
+     * @param bool   $required   Required param of the property.
      *
      * @throws BadPropertyDefinitionException
      */
     private function _processPropertyDefinitionString(
         $propName,
-        $propDefStr)
+        $propDefStr,
+        $required)
     {
         try {
             // Validates the definition and throws if bad.
@@ -980,7 +1004,8 @@ class PropertyMapCompiler
             // problem, since such classnames will warn as "not found" here.
             $propDefObj = new PropertyDefinition( // Throws.
                 $propDefStr,
-                $this->_currentClassInfo['namespace']
+                $this->_currentClassInfo['namespace'],
+                $required
             );
 
             // MEMORY OPTIMIZATION TRICK: If we wanted to be "naive", we could

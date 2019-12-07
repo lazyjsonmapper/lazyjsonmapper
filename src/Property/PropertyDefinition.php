@@ -84,6 +84,16 @@ class PropertyDefinition
     public $isObjectType;
 
     /**
+     * Whether the property is necessarily expected
+     *
+     * Tip: If this value is `TRUE` then if property not in data you'll get an
+     * exception
+     *
+     * @var bool
+     */
+    public $required;
+
+    /**
      * List of valid basic PHP types.
      *
      * `NOTE:` We don't include `array`, `object` or `null`. Because we handle
@@ -116,21 +126,26 @@ class PropertyDefinition
      *                                   format). If no namespace is provided,
      *                                   all classes are assumed to be relative
      *                                   to the global namespace (`\`).
+     * @param bool        $required      Checks if the property is required.
      *
      * @throws BadPropertyDefinitionException If the provided definition is invalid.
      */
     public function __construct(
         $definitionStr = null,
-        $baseNamespace = '')
+        $baseNamespace = '',
+        $required      = false)
     {
         // Handle the creation of untyped properties.
         if ($definitionStr === null) {
             $this->arrayDepth = 0;
             $this->propType = null;
             $this->isObjectType = false;
+            $this->required = false;
 
             return; // Skip the rest of the code.
         }
+
+        $this->required = $required;
 
         if (!is_string($definitionStr)) {
             throw new BadPropertyDefinitionException(
@@ -309,7 +324,8 @@ class PropertyDefinition
             '%s%s%s',
             $this->isObjectType ? '\\' : '',
             $this->propType !== null ? $this->propType : 'mixed',
-            str_repeat('[]', $this->arrayDepth)
+            str_repeat('[]', $this->arrayDepth),
+            $this->required ? 'true' : 'false'
         );
     }
 

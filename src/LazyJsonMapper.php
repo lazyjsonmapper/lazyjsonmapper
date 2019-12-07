@@ -1517,7 +1517,7 @@ class LazyJsonMapper implements Serializable, JsonSerializable
      *
      * @see LazyJsonMapper::asJson()
      */
-    final public function __toString()
+    public function __toString()
     {
         try {
             return $this->asJson(); // Throws.
@@ -2332,7 +2332,7 @@ class LazyJsonMapper implements Serializable, JsonSerializable
      * @see LazyJsonMapper::_getProperty()
      * @see LazyJsonMapper::__set()
      */
-    final public function &__get(
+    public function &__get(
         $propName)
     {
         if (!static::ALLOW_VIRTUAL_PROPERTIES) {
@@ -2397,7 +2397,7 @@ class LazyJsonMapper implements Serializable, JsonSerializable
      * @return bool `TRUE` if the property exists in the object instance's data
      *              and is non-`NULL`.
      */
-    final public function __isset(
+    public function __isset(
         $propName)
     {
         if (!static::ALLOW_VIRTUAL_PROPERTIES) {

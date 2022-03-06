@@ -1,5 +1,10 @@
 # LazyJsonMapper
 
+![lazyjson](https://avatars.githubusercontent.com/u/38916800?s=200&v=4)
+
+![php](https://img.shields.io/badge/php-%3E%3D%207.0-blue.svg) [![sponsor](https://img.shields.io/badge/-Become%20a%20sponsor%20❤-ff6964)](https://github.com/sponsors/mgp25)
+
+
 ## Advanced, intelligent & automatic object-oriented JSON containers for PHP.
 
 Implements a highly efficient, automatic, object-oriented and lightweight
@@ -165,7 +170,7 @@ without having to worry about doing any of the tedious parsing yourself.
 
 ### Installation
 
-You need at least PHP 5.6 or higher. PHP 7+ is also fully supported and is recommended.
+You need at least PHP 7.0 or higher. PHP 8 is also fully supported and is recommended.
 
 Run the following [Composer](https://getcomposer.org/download/) installation command:
 
@@ -175,7 +180,7 @@ composer require lazyjsonmapper/lazyjsonmapper
 
 ### Examples
 
-View the contents of the [`examples/`](https://github.com/SteveJobzniak/LazyJsonMapper/tree/master/examples) folder.
+View the contents of the [`examples/`](https://github.com/lazyjsonmapper/lazyjsonmapper/tree/master/examples) folder.
 
 ### Documentation
 
@@ -193,7 +198,7 @@ utility's source code.
 
 ### Copyright
 
-Copyright 2017 The LazyJsonMapper Project
+Copyright 2022 The LazyJsonMapper Project
 
 ### License
 

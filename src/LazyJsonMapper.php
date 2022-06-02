@@ -2435,10 +2435,10 @@ class LazyJsonMapper
      * Called during serialization of the object.
      *
      * You are not supposed to call this directly. Instead, use PHP's global
-     * `__serialice()` call:
+     * `serialize()` call:
      *
      * ```php
-     * $savedStr = __serialice($obj);
+     * $savedStr = serialize($obj);
      * ```
      *
      * This serializer is thin and efficient. It simply recursively packs all
@@ -2457,10 +2457,10 @@ class LazyJsonMapper
      * your `LazyJsonMapper` subclasses are supposed to be designed. If they
      * need custom properties, then you can handle those in `_init()` as usual.
      *
-     * Lastly, you should know that calling `__serialice()` will not disrupt any
+     * Lastly, you should know that calling `__serialize()` will not disrupt any
      * internal data of the current object instance that you're serializing.
      * You can therefore continue to work with the object afterwards, or even
-     * `__serialice()` the same instance multiple times.
+     * `__serialize()` the same instance multiple times.
      *
      * @throws LazySerializationException If the internal data array cannot be
      *                                    serialized. But this problem can
@@ -2469,18 +2469,18 @@ class LazyJsonMapper
      *                                    non-serializable sub-objects within
      *                                    your data array AND those objects in
      *                                    turn throw exceptions when trying to
-     *                                    `__serialice()`. That's NEVER going to
+     *                                    `__serialize()`. That's NEVER going to
      *                                    happen with real `json_decode()` data;
      *                                    so if you constructed our object with
      *                                    real JSON data then you never have to
-     *                                    look for `__serialice()` exceptions.
+     *                                    look for `__serialize()` exceptions.
      *
      * @return string The object's internal data as a string representation.
      *                Note that serialization produces strings containing binary
      *                data which cannot be handled as text. It is intended for
      *                storage in binary format (ie a `BLOB` database field).
      */
-    final public function __serialice()
+    final public function __serialize()
     {
         // Tell all of our LJM-properties to pack themselves as plain arrays.
         // NOTE: We don't do any value-conversion or validation of properties,
@@ -2491,7 +2491,7 @@ class LazyJsonMapper
             if (is_object($value) && $value instanceof self) {
                 // This call will recursively detect and take care of nested
                 // objects and return ALL of their data as plain sub-arrays.
-                $value = $value->__serialice($value); // Throws.
+                $value = $value->__serialize($value); // Throws.
             }
         });
 
@@ -2510,7 +2510,7 @@ class LazyJsonMapper
 
         try {
             // NOTE: This will ALWAYS succeed if the JSON data array is pure.
-            $serialized = __serialice($objectData); // Throws.
+            $serialized = serialize($objectData); // Throws.
         } catch (\Exception $e) { // IMPORTANT: Catch ANY exception!
             // This can literally ONLY happen if the user has given us (and now
             // wants to serialize) non-JSON data containing other objects that
@@ -2522,7 +2522,7 @@ class LazyJsonMapper
         }
 
         if (!is_string($serialized)) {
-            // Anything other than a string means that __serialice() failed.
+            // Anything other than a string means that __serialize() failed.
             // NOTE: This should NEVER be able to happen!
             throw new LazySerializationException(
                 'The object data could not be serialized.'
@@ -2537,10 +2537,10 @@ class LazyJsonMapper
      * Called during unserialization of the object.
      *
      * You are not supposed to call this directly. Instead, use PHP's global
-     * `__unserialice()` call:
+     * `unserialize()` call:
      *
      * ```php
-     * $restoredObj = __unserialice($savedStr);
+     * $restoredObj = unserialize($savedStr);
      * ```
      *
      * This unserializer is thin and efficient. It simply unpacks the serialized
@@ -2573,7 +2573,7 @@ class LazyJsonMapper
      *                                    JSON data is not validated (analyzed)
      *                                    when it reaches the constructor. The
      *                                    most likely reasons why this exception
-     *                                    would be thrown during `__unserialice()`
+     *                                    would be thrown during `__unserialize()`
      *                                    is that your class property map is
      *                                    invalid and could not be compiled, and
      *                                    thus the object couldn't be recreated,
@@ -2581,7 +2581,7 @@ class LazyJsonMapper
      *
      * @see LazyJsonMapper::__construct()
      */
-    final public function __unserialice(
+    final public function __unserialize(
         $serialized = null)
     {
         $objectData = null;
@@ -2593,7 +2593,7 @@ class LazyJsonMapper
             // NOTE: If the original object only contained perfect JSON data,
             // then there are no sub-objects. But if any sub-objects existed
             // within the data, this will recursively unserialize those too.
-            $objectData = __unserialice($serialized); // Throws.
+            $objectData = unserialize($serialized); // Throws.
         } catch (\Exception $e) { // IMPORTANT: Catch ANY exception!
             // This can literally ONLY happen if the user had given us (and then
             // serialized) non-JSON data containing other objects that attempt

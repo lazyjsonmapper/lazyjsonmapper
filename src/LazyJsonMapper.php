@@ -17,6 +17,8 @@
 
 namespace LazyJsonMapper;
 
+use ArrayIterator;
+use IteratorAggregate;
 use LazyJsonMapper\Exception\LazyJsonMapperException;
 use LazyJsonMapper\Exception\LazySerializationException;
 use LazyJsonMapper\Exception\LazyUserException;
@@ -31,6 +33,7 @@ use LazyJsonMapper\Property\PropertyMapCompiler;
 use LazyJsonMapper\Property\UndefinedProperty;
 use LazyJsonMapper\Property\ValueConverter;
 use stdClass;
+use Traversable;
 
 /**
  * Advanced, intelligent & automatic object-oriented JSON containers for PHP.
@@ -200,7 +203,7 @@ use stdClass;
  * @license http://www.apache.org/licenses/LICENSE-2.0
  * @author SteveJobzniak (https://github.com/SteveJobzniak)
  */
-class LazyJsonMapper
+class LazyJsonMapper implements IteratorAggregate
 {
     /**
      * Whether "direct virtual properties" access is enabled.
@@ -2689,5 +2692,15 @@ class LazyJsonMapper
         self::$_propertyMapCache->clearCache();
 
         return $classCount;
+    }
+
+    /**
+     * Iterable access to data and properties
+     *
+     * @return Traversable
+     */
+    final public function getIterator(): Traversable
+    {
+        return new ArrayIterator($this->_objectData);
     }
 }

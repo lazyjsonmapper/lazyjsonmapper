@@ -175,7 +175,7 @@ You need at least PHP 7.0 or higher. PHP 8 is also fully supported and is recomm
 Run the following [Composer](https://getcomposer.org/download/) installation command:
 
 ```
-composer require lazyjsonmapper/lazyjsonmapper
+composer require jeely/lazyjsonmapper
 ```
 
 ### Examples

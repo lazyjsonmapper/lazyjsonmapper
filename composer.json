@@ -1,5 +1,5 @@
 {
-    "name": "lazyjsonmapper/lazyjsonmapper",
+    "name": "jeely/lazyjsonmapper",
     "type": "library",
     "description": "Advanced, intelligent & automatic object-oriented JSON containers for PHP.",
     "keywords": ["json", "development"],

@@ -18,6 +18,7 @@
 namespace LazyJsonMapper;
 
 use ArrayIterator;
+use Generator;
 use IteratorAggregate;
 use LazyJsonMapper\Exception\LazyJsonMapperException;
 use LazyJsonMapper\Exception\LazySerializationException;
@@ -2701,6 +2702,8 @@ class LazyJsonMapper implements IteratorAggregate
      */
     final public function getIterator(): Traversable
     {
-        return new ArrayIterator($this->_objectData);
+        foreach ($this->_objectData as $key => $value) {
+            yield $key => $this->_getProperty($key);
+        }
     }
 }

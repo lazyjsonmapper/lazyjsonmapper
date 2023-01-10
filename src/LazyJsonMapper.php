@@ -746,8 +746,12 @@ class LazyJsonMapper
         array $objectData = [],
         $requireAnalysis = false)
     {
+        $generateObjectData = [];
+        array_walk_recursive($objectData, function ($item, $key) use (&$generateObjectData) {
+            $generateObjectData[lcfirst($key)] = $item;
+        });
         // Save the provided JSON data array.
-        $this->_objectData = $objectData;
+        $this->_objectData = $generateObjectData;
 
         // Recursively look for missing/bad JSON properties, if scan requested.
         // NOTE: "Bad" in this case includes things like fatal mismatches
